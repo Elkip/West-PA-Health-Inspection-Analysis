@@ -1,0 +1,224 @@
+---
+title: West PA Health Inspections Analysis 2025
+subtitle: A list of restaurants to avoid
+author:
+  - name: Mitchell Henschel
+format:  
+  markdown:
+    echo: false
+---
+
+
+```{r}
+#| output: false
+
+# SETUP
+library(dplyr)
+library(glue)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+inspections <- read.csv("out/violations_by_inspection.csv") |>
+  select(name, inspect_dt, REPORT, TOTAL_RISK_SCORE, TOTAL_VIOLATIONS, NUM_HIGH) |>
+  filter(inspect_dt >= "2025-01-01")
+
+yearly <- read.csv("out/violations_by_year.csv") |>
+  select(name, inspect_yr, REPORT, TOTAL_RISK_SCORE, NUM_INSPECTIONS, AVG_RISK_SCORE, TOTAL_VIOLATIONS) |>
+  filter(inspect_yr == 2025)
+```
+
+# Introduction
+
+Although West PA health inspection data are avaiable to the public, there lacks a clear way to view a summary of which restaurants had the most violations other than individually downloading each inspection report. And even then, there are codes on these reports that are not clearly explained.
+
+As a local data scientist I thought it would fun to come up with a ranking system. There are 33 different violation categories that fall into low, medium, or high risk (median risk was used for violations that can vary in seriousness). The following weights were determined:
+
+| VIOLATION | RISK | RISK_SCORE |
+|:------------|------|-----------:|
+| Certified Food Protection Manager | HIGH | 5 |
+| Handwashing Facilities | HIGH | 5 |
+| Hot Holding Temperatures | MED | 3 |
+| Pest Management | MED | 3 |
+| Cross-Contamination Prevention | MED-LOW | 2 |
+| Cold Holding Temperatures | MED | 3 |
+| Probe-Type Thermometers | LOW | 1 |
+| Cleaning and Sanitization | MED | 3 |
+| Toxic Items | HIGH | 5 |
+| Plumbing | HIGH | 5 |
+| Consumer Advisory | HIGH | 5 |
+| Facilities to Maintain Temperature | HIGH | 5 |
+| Employee Personal Hygiene | MED | 3 |
+| Food Source/Condition | MED | 3 |
+| Waste Water Disposal | HIGH | 5 |
+| Cooling Food | MED | 3 |
+| Water Supply | HIGH | 5 |
+| Demonstration of Knowledge | HIGH | 5 |
+| Date Marking of Food | HIGH | 5 |
+| Reheating Temperatures | MED | 3 |
+| Employee Health | MED-LOW | 2 |
+| Cooking Temperatures | MED  | 3 |
+| Contamination Prevention - Food, Utensils and Equipment | HIGH-MED | 4 |
+| Toilet Room | HIGH-MED | 4 |
+| Garbage and Refuse | HIGH-MED | 4 |
+| Administrative | HIGH-MED | 4 |
+| Fabrication, Design, Installation and Maintenance | HIGH-MED | 4 |
+| Ventilation | HIGH-MED | 4 |
+| Lighting | HIGH-MED | 4 |
+| Floors | HIGH-MED | 4 |
+| Walls and ceilings | HIGH-MED | 4 |
+| Dressing rooms and Locker rooms | HIGH-MED | 4 |
+| General Premises | HIGH-MED | 4 |
+
+Full dataset available at:
+https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations
+
+# Stats for Nerds
+
+Distribution of calculated risk scores for all inspections:
+
+```{r}
+ggplot(inspections, aes(x = TOTAL_RISK_SCORE)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30,
+                 fill = "#69b3a2",
+                 color = "white",
+                 alpha = 0.8) +
+  geom_density(color = "#1f4e79", linewidth = 1.2) +
+  labs(
+    title = "Distribution of Health Inspection Risk Scores",
+    x = "Total Risk Score",
+    y = "Density"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+
+```{r}
+pct_tbl <- inspections |>
+  summarise(
+    Min = min(TOTAL_RISK_SCORE),
+    Q1 = quantile(TOTAL_RISK_SCORE, 0.25),
+    Median = quantile(TOTAL_RISK_SCORE, 0.50),
+    Avg = mean(TOTAL_RISK_SCORE),
+    Q3 = quantile(TOTAL_RISK_SCORE, 0.75),
+    Max = max(TOTAL_RISK_SCORE)
+  ) |>
+  pivot_longer(cols = everything(),
+                      names_to = "Percentile",
+                      values_to = "RiskScore")
+
+kable(pct_tbl, digits = 2, caption = "Risk Score Percentiles")
+```
+
+The distribution of inspection scores is highly skewed. I would consider the median score of 19 as the 'clean' threshold, and the Q3 of 31 to be the 'acceptable' threshold.
+
+
+To be fair to restaurants who scored better upon reinspection, I also analyze the average inspection score across all inspections in 2025.
+
+```{r}
+ggplot(yearly, aes(x = AVG_RISK_SCORE)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30,
+                 fill = "#69b3a2",
+                 color = "white",
+                 alpha = 0.8) +
+  geom_density(color = "#1f4e79", linewidth = 1.2) +
+  labs(
+    title = "Distribution of Average Health Inspection Risk Score 2025",
+    x = "Total Risk Score",
+    y = "Density"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+
+```{r}
+pct_tbl <- yearly |>
+  summarise(
+    Min = min(AVG_RISK_SCORE),
+    Q1 = quantile(AVG_RISK_SCORE, 0.25),
+    Median = quantile(AVG_RISK_SCORE, 0.50),
+    Avg = mean(AVG_RISK_SCORE),
+    Q3 = quantile(AVG_RISK_SCORE, 0.75),
+    Max = max(AVG_RISK_SCORE)
+  ) |>
+  pivot_longer(cols = everything(),
+                      names_to = "Percentile",
+                      values_to = "RiskScore")
+
+kable(pct_tbl, digits = 2, caption = "Average Risk Score Percentiles")
+```
+
+A very similar distribution is observed for average health inspection score.
+
+# WALL OF SHAME 2025
+
+Click on the restaurant name to view the full health inspection report.
+
+### By Inspection
+```{r}
+ inspections |>
+  arrange(desc(TOTAL_RISK_SCORE)) |>
+  head(10) |>
+  mutate(
+    name = glue("[{name}]({REPORT})")
+  ) |>
+  select(-REPORT) |>
+  kable(escape = FALSE, caption = "Top 10 inspections by risk score")
+```
+
+
+```{r}
+inspections |>
+  arrange(desc(NUM_HIGH)) |>
+  head(10) |>
+  mutate(
+    name = glue("[{name}]({REPORT})")
+  ) |>
+  select(-REPORT) |>
+  kable(escape = FALSE, caption = "Top 10 inspections by number of high risk violations")
+```
+
+### Overall Yearly 
+
+```{r}
+yearly |>
+  arrange(desc(AVG_RISK_SCORE)) |>
+  head(10) |>
+  mutate(
+    name = glue("[{name}]({REPORT})")
+  ) |>
+  select(-REPORT) |>
+  kable(escape = FALSE, caption = "Top 10 restaurants by average risk score in 2025", digits = 2)
+```
+
+
+```{r}
+yearly |>
+  arrange(desc(NUM_INSPECTIONS)) |>
+  head(10) |>
+  mutate(
+    name = glue("[{name}]({REPORT})")
+  ) |>
+  select(-REPORT) |>
+  kable(escape = FALSE, caption = "Top 10 restaurants by number of inspections in 2025", digits = 2)
+```
+
+```{r}
+yearly |>
+  arrange(desc(TOTAL_VIOLATIONS)) |>
+  head(10) |>
+  mutate(
+    name = glue("[{name}]({REPORT})")
+  ) |>
+  select(-REPORT) |>
+  kable(escape = FALSE, caption = "Top 10 restaurants by total violations in 2025", digits = 2)
+```
+
+# Discussion
+
+
+
+#### Written by a human, with no use of AI <3
+
