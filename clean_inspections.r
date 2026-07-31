@@ -10,6 +10,7 @@ require(tidyr)
 violations <- read.csv("data/violations.csv") |>
   filter(!stringr::str_detect(tolower(facility_name), "(test client)|(test)|(test / training client)")) |>
   select(X_id, facility_name, description_new, street, city, inspect_dt, url) |>
+  arrange(inspect_dt) |>
   rename(id = X_id, violation = description_new) |>
   mutate(name = glue("{facility_name} - {street}, {city}"), 
     inspect_yr = lubridate::year(inspect_dt),
