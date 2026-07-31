@@ -1,11 +1,24 @@
 ---
 title: West PA Health Inspections Analysis 2025
-subtitle: A list of restaurants to avoid
+subtitle: Ranking the Most Unsanitiary Food Establishments
 author:
   - name: Mitchell Henschel
-format:  
-  markdown:
-    echo: false
+execute: 
+  echo: false
+format:
+  pdf:
+    toc: true
+    fig-pos: 'H'
+    header-includes:
+      - \usepackage{hyperref} 
+      - \usepackage{fancyhdr}
+      - \usepackage{float}
+      - \pagestyle{fancy}
+      - \fancyhf{}
+      - \fancyhead[R]{\thepage}
+      - \renewcommand{\headrulewidth}{0pt}
+    output-file: 2025_West_PA_Health_Violations
+
 ---
 
 
@@ -18,21 +31,40 @@ library(glue)
 library(tidyr)
 library(ggplot2)
 library(knitr)
+library(kableExtra)
+
+# for converting strings to LaTeX
+escape_latex_str <- function(x) {
+  x |>
+    gsub("&", "\\\\&", x = _) |>
+    gsub("%", "\\\\%", x = _) |>
+    gsub("#", "\\\\#", x = _) |>
+    gsub("_", "\\\\_", x = _)
+}
 
 inspections <- read.csv("out/violations_by_inspection.csv") |>
   select(name, inspect_dt, REPORT, TOTAL_RISK_SCORE, TOTAL_VIOLATIONS, NUM_HIGH) |>
-  filter(inspect_dt >= "2025-01-01")
+  filter(inspect_dt >= "2025-01-01") |>
+  mutate(name = escape_latex_str(name), REPORT = escape_latex_str(REPORT)) |>
+  mutate_at(c("TOTAL_RISK_SCORE", "TOTAL_VIOLATIONS", "NUM_HIGH"), as.numeric)
 
 yearly <- read.csv("out/violations_by_year.csv") |>
   select(name, inspect_yr, REPORT, TOTAL_RISK_SCORE, NUM_INSPECTIONS, AVG_RISK_SCORE, TOTAL_VIOLATIONS) |>
-  filter(inspect_yr == 2025)
+  filter(inspect_yr == 2025) |> 
+  mutate(name = escape_latex_str(name), REPORT = escape_latex_str(REPORT)) |>
+  mutate_at(c("TOTAL_RISK_SCORE", "NUM_INSPECTIONS", "AVG_RISK_SCORE", "TOTAL_VIOLATIONS"), as.numeric)
+
 ```
+
+\pagebreak
 
 # Introduction
 
-Although West PA health inspection data are avaiable to the public, there lacks a clear way to view a summary of which restaurants had the most violations other than individually downloading each inspection report. And even then, there are codes on these reports that are not clearly explained.
+From 2014-2025, there were 404,513 health code violations across 90,066 inspections in Western PA. In 2025 alone, there were 28,777 violations across 5,034 inspections.
 
-As a local data scientist I thought it would fun to come up with a ranking system. There are 33 different violation categories that fall into low, medium, or high risk (median risk was used for violations that can vary in seriousness). The following weights were determined:
+Although the data is available to the public, there lacks a clear way to view a summary of which restaurants had the most violations other than individually downloading each inspection report. And even then, there are codes on these reports that are not clearly explained.
+
+As a local data scientist, I thought it would fun to come up with a ranking system. There are 33 different violation categories that fall into low, medium, or high risk (median risk was used for violations that can vary in seriousness). The following weights were determined:
 
 | VIOLATION | RISK | RISK_SCORE |
 |:------------|------|-----------:|
@@ -73,6 +105,8 @@ As a local data scientist I thought it would fun to come up with a ranking syste
 Full dataset available at:
 https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations
 
+\pagebreak
+
 # Stats for Nerds
 
 Distribution of calculated risk scores for all inspections:
@@ -86,7 +120,7 @@ ggplot(inspections, aes(x = TOTAL_RISK_SCORE)) +
                  alpha = 0.8) +
   geom_density(color = "#1f4e79", linewidth = 1.2) +
   labs(
-    title = "Distribution of Health Inspection Risk Scores",
+    title = "West PA Health Inspection Risk Scores",
     x = "Total Risk Score",
     y = "Density"
   ) +
@@ -111,10 +145,10 @@ pct_tbl <- inspections |>
 kable(pct_tbl, digits = 2, caption = "Risk Score Percentiles")
 ```
 
-The distribution of inspection scores is highly skewed. I would consider the median score of 19 as the 'clean' threshold, and the Q3 of 31 to be the 'acceptable' threshold.
+The distribution of inspection scores is highly skewed.
 
 
-To be fair to restaurants who scored better upon reinspection, I also analyze the average inspection score across all inspections in 2025.
+To be fair to restaurants who scored better upon reinspection, I also analyze the average risk score across all inspections in 2025.
 
 ```{r}
 ggplot(yearly, aes(x = AVG_RISK_SCORE)) +
@@ -125,7 +159,7 @@ ggplot(yearly, aes(x = AVG_RISK_SCORE)) +
                  alpha = 0.8) +
   geom_density(color = "#1f4e79", linewidth = 1.2) +
   labs(
-    title = "Distribution of Average Health Inspection Risk Score 2025",
+    title = "West PA Average Health Inspection Risk Score 2025",
     x = "Total Risk Score",
     y = "Density"
   ) +
@@ -152,73 +186,163 @@ kable(pct_tbl, digits = 2, caption = "Average Risk Score Percentiles")
 
 A very similar distribution is observed for average health inspection score.
 
+I would consider the median score of 19 as the 'clean' threshold, and the Q3 of 32 to be the 'acceptable' threshold.
+
+Now without further ado
+
 # WALL OF SHAME 2025
 
-Click on the restaurant name to view the full health inspection report.
+Click on the food facility name in the below table to view the full health inspection report. In the tables summarized by year the most recent inspection is linked.
 
-### By Inspection
 ```{r}
  inspections |>
   arrange(desc(TOTAL_RISK_SCORE)) |>
-  head(10) |>
+  head(20) |>
   mutate(
-    name = glue("[{name}]({REPORT})")
+    name = paste0("\\href{", REPORT,"}{", name, "}")
   ) |>
   select(-REPORT) |>
-  kable(escape = FALSE, caption = "Top 10 inspections by risk score")
+  kable(caption = "Top 20 inspections by risk score", format = "latex",
+      col.names = c("Location", "Date", "Risk Score", "Num Violations", "Num High Risk"), 
+      escape = FALSE, booktabs = TRUE) |>
+  kable_paper(latex_options = "striped", full_width = TRUE) |>
+  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
 ```
-
 
 ```{r}
 inspections |>
-  arrange(desc(NUM_HIGH)) |>
-  head(10) |>
+  arrange(desc(NUM_HIGH), desc(TOTAL_RISK_SCORE)) |>
+  head(20) |>
   mutate(
-    name = glue("[{name}]({REPORT})")
+    name = paste0("\\href{", REPORT,"}{", name, "}")
   ) |>
   select(-REPORT) |>
-  kable(escape = FALSE, caption = "Top 10 inspections by number of high risk violations")
+  kable(caption = "Top 20 inspections by number of high risk violations", format = "latex",
+    col.names = c("Location", "Date", "Risk Score", "Num Violations", "Num High Risk"), 
+    escape = FALSE, booktabs = TRUE) |>
+  kable_paper(latex_options = "striped", full_width = TRUE) |>
+  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
 ```
-
-### Overall Yearly 
 
 ```{r}
 yearly |>
   arrange(desc(AVG_RISK_SCORE)) |>
-  head(10) |>
+  head(20) |>
   mutate(
-    name = glue("[{name}]({REPORT})")
+    name = paste0("\\href{", REPORT,"}{", name, "}")
   ) |>
   select(-REPORT) |>
-  kable(escape = FALSE, caption = "Top 10 restaurants by average risk score in 2025", digits = 2)
+  kable(caption = "Top 20 restaurants by average risk score in 2025", digits = 2, format = "latex",
+    col.names = c("Location", "Year", "Risk Score", "Num Inspections", "Average Risk", "Num Violations"), 
+    escape = FALSE, booktabs = TRUE) |>
+  kable_paper(latex_options = "striped", full_width = TRUE) |>
+  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
 ```
 
 
 ```{r}
 yearly |>
-  arrange(desc(NUM_INSPECTIONS)) |>
-  head(10) |>
+  arrange(desc(NUM_INSPECTIONS), desc(AVG_RISK_SCORE)) |>
+  head(20) |>
   mutate(
-    name = glue("[{name}]({REPORT})")
+    name = paste0("\\href{", REPORT,"}{", name, "}")
   ) |>
   select(-REPORT) |>
-  kable(escape = FALSE, caption = "Top 10 restaurants by number of inspections in 2025", digits = 2)
+  kable(caption = "Top 20 restaurants by number of inspections in 2025", digits = 2, format = "latex",
+    col.names = c("Location", "Year", "Risk Score", "Num Inspections", "Average Risk", "Num Violations"), 
+    escape = FALSE, booktabs = TRUE) |>
+  kable_styling(latex_options = "striped") |>
+  kable_paper(latex_options = "striped", full_width = TRUE) |>
+  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
 ```
 
 ```{r}
 yearly |>
-  arrange(desc(TOTAL_VIOLATIONS)) |>
-  head(10) |>
+  arrange(desc(TOTAL_VIOLATIONS), desc(AVG_RISK_SCORE)) |>
+  head(20) |>
   mutate(
-    name = glue("[{name}]({REPORT})")
+    name = paste0("\\href{", REPORT,"}{", name, "}")
   ) |>
   select(-REPORT) |>
-  kable(escape = FALSE, caption = "Top 10 restaurants by total violations in 2025", digits = 2)
+  kable(caption = "Top 20 restaurants by total violations in 2025", digits = 2, format = "latex",
+    col.names = c("Location", "Year", "Risk Score", "Num Inspections", "Average Risk", "Num Violations"), 
+    escape = FALSE, booktabs = TRUE) |>
+  kable_paper(latex_options = "striped", full_width = TRUE) |>
+  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
 ```
+
 
 # Discussion
 
+Just from skimming some of these reports, here's some of my favorite excerpts:
 
+**Lucca Ristorante & Wine Bar, Craig St, 07/01/2025:**
+
+- There are bottles of liquor stored beneath and contaminated by an unknown water source from 
+the active ceiling leak behind the bar. The operator voluntarily moved the affected bottles to a safe 
+storage location and discontinued service behind the bar.
+
+**The Library, Carson St, 03/08/2025:**
+
+-  Numerous rodent droppings [in 6 areas]... Nesting material was identified [in 4 areas]... Loose bait found in kitchen and basement.
+
+- Black mold-like substance and a pink biofilm was identified on the ice machine deflector plate 
+and surrounding areas. 
+
+- Oyster and chicken breading preparation cooler interior has excessive amounts of old food debris.
+
+- It was discovered that the dish machine is not functioning properly and is failing to sanitize 
+effectively. The chlorine readout measured at 0.00 PPM. Owner initiated a phone call for repairs. 
+
+**Zen Asian Diner, Butler St, 07/14/2025**
+
+- In basement, there is a decayed corpse of an animal, about the size of a possum or large rat. 
+Unable to determine the type of animal during inspection.
+
+- Too many flies to count found throughout all food preparation areas of entire facility.
+
+- The garage that holds the dumpster and grease receptacle has a door that leads directly into the 
+food preparation room and that door does not seal.
+
+*REPEAT VIOLATIONS*
+
+**Fun Asian Bistro, Frankstown Rd, 07/01/2025**
+
+- Did not observe any employee handwashing during inspection. 
+
+- Employee observed eating on cookline.
+
+- Temperature/Time Controlled for Safety (TCS) foods such as tofu, beef, chicken, cooked noodles, 
+and cooked rice were found between 45-55F in the two-door and three-door prep coolers. All foods 
+discarded. 
+
+- Cooked chicken by grill had a temperature of 75F. Owner says it was cooked this morning. 
+Discarded during inspection. *REPEAT VIOLATION*
+
+\pagebreak
+
+**Hastina Royal Indian Cuisine, Park Manor Boulevard, 06/11/2025**
+
+- Facility is open and operating without a valid health permit. 
+
+- Facility failed to submit plans for a change of ownership and transfer of a sister LLC.
+
+- Consumer alert administered during inspection due to several high and medium risk violations.
+
+
+**The Mintt, Banksville Rd, 04/21/2025**
+
+- In the walk-in cooler, a container of raw lamb was observed stored behind a loosely covered bowl 
+of dough. Blood was observed to have dripped onto the plastic wrap covering a bowl of pudding.
+
+---
+
+Health inspections are merely a snapshot of how a restaurant is operating at a specific point in time, not a permanent verdict. Most violations are trivial mistakes that we could make in our own kitchen. However, if serious violations are repeated then restaurants should be held accountable. Stay informed and grab the inspection report before hitting the buffet. 
+
+Questions and suggestions on my methodology are welcome. Thanks for reading! 
+
+[Source code](https://github.com/Elkip/West-PA-Health-Inspection-Analysis/tree/master)
+
+[Google Sheets With All Data](https://docs.google.com/spreadsheets/d/14fzHPMQwi2yXgINs_aTp1Vy-1ni_tRFI3wfmFX-IPXc)
 
 #### Written by a human, with no use of AI <3
-
