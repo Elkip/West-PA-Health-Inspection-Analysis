@@ -1,18 +1,21 @@
 ---
-title: West PA Health Inspections Analysis 2025
-subtitle: Ranking the Most Unsanitiary Food Establishments
+title: Allegheny County Food Inspection Analysis 2025
+subtitle: Ranking Recorded Violations in the Available January–July Data
 author:
   - name: Mitchell Henschel
-execute: 
+execute:
   echo: false
+  message: false
 format:
   pdf:
     toc: true
     fig-pos: 'H'
     header-includes:
-      - \usepackage{hyperref} 
+      - \usepackage{hyperref}
       - \usepackage{fancyhdr}
       - \usepackage{float}
+      - \usepackage{booktabs}
+      - \usepackage{longtable}
       - \pagestyle{fancy}
       - \fancyhf{}
       - \fancyhead[R]{\thepage}
@@ -23,36 +26,81 @@ format:
 
 
 ```{r}
-#| output: false
+#| include: false
 
-# SETUP
-library(dplyr)
-library(glue)
-library(tidyr)
+# SETUP: first run Rscript clean_inspections.r
+source("R/inspection_analysis.R")
 library(ggplot2)
 library(knitr)
-library(kableExtra)
-
-# for converting strings to LaTeX
-escape_latex_str <- function(x) {
-  x |>
-    gsub("&", "\\\\&", x = _) |>
-    gsub("%", "\\\\%", x = _) |>
-    gsub("#", "\\\\#", x = _) |>
-    gsub("_", "\\\\_", x = _)
+options(knitr.kable.NA = "—")
+if (!knitr::is_latex_output()) {
+  knitr::opts_chunk$set(fig.path = "2025_hall_of_shame_markdown_files/figure-commonmark/")
 }
 
-inspections <- read.csv("out/violations_by_inspection.csv") |>
-  select(name, inspect_dt, REPORT, TOTAL_RISK_SCORE, TOTAL_VIOLATIONS, NUM_HIGH) |>
-  filter(inspect_dt >= "2025-01-01") |>
-  mutate(name = escape_latex_str(name), REPORT = escape_latex_str(REPORT)) |>
-  mutate_at(c("TOTAL_RISK_SCORE", "TOTAL_VIOLATIONS", "NUM_HIGH"), as.numeric)
+escape_latex_str <- function(x) {
+  replacements <- c(
+    "\\" = "\\textbackslash{}", "&" = "\\&", "%" = "\\%", "$" = "\\$",
+    "#" = "\\#", "_" = "\\_", "{" = "\\{", "}" = "\\}",
+    "~" = "\\textasciitilde{}", "^" = "\\textasciicircum{}"
+  )
+  vapply(strsplit(x, "", fixed = TRUE), function(chars) {
+    paste0(ifelse(chars %in% names(replacements), replacements[chars], chars), collapse = "")
+  }, character(1))
+}
 
-yearly <- read.csv("out/violations_by_year.csv") |>
-  select(name, inspect_yr, REPORT, TOTAL_RISK_SCORE, NUM_INSPECTIONS, AVG_RISK_SCORE, TOTAL_VIOLATIONS) |>
-  filter(inspect_yr == 2025) |> 
-  mutate(name = escape_latex_str(name), REPORT = escape_latex_str(REPORT)) |>
-  mutate_at(c("TOTAL_RISK_SCORE", "NUM_INSPECTIONS", "AVG_RISK_SCORE", "TOTAL_VIOLATIONS"), as.numeric)
+report_table <- function(data, caption, digits = 0) {
+  latex <- knitr::is_latex_output()
+  if (latex) {
+    data <- mutate(data, across(where(is.character), escape_latex_str))
+    data$name <- paste0("\\href{", data$REPORT, "}{", data$name, "}")
+  } else {
+    data$name <- paste0("[", gsub("|", "&#124;", data$name, fixed = TRUE), "](", data$REPORT, ")")
+  }
+  data <- select(data, -REPORT)
+  names(data)[names(data) == "name"] <- "Facility"
+  alignment <- ifelse(vapply(data, is.numeric, logical(1)), "r", "l")
+  table <- kable(
+    data, caption = caption, digits = digits, escape = FALSE, align = alignment,
+    format = if (latex) "latex" else "pipe", booktabs = TRUE, longtable = TRUE
+  )
+  if (latex) {
+    widths <- alignment
+    widths[names(data) == "Facility"] <- "p{4.2cm}"
+    widths[names(data) == "Purpose"] <- "p{2.2cm}"
+    table <- sub(
+      paste0("{", paste0(alignment, collapse = ""), "}"),
+      paste0("{", paste0(widths, collapse = ""), "}"), table, fixed = TRUE
+    )
+  }
+  knitr::asis_output(paste(table, collapse = "\n"))
+}
+
+all_inspections <- read.csv(
+  "out/violations_by_inspection.csv", colClasses = c(encounter = "character", id = "character")
+) |>
+  mutate(inspect_dt = as.Date(inspect_dt))
+inspections <- all_inspections |>
+  filter(inspect_dt >= as.Date("2025-01-01"), inspect_dt < as.Date("2026-01-01")) |>
+  rank_inspections()
+yearly <- read.csv("out/violations_by_year.csv", colClasses = c(id = "character")) |>
+  filter(inspect_yr == 2025)
+initial_yearly <- yearly |>
+  filter(NUM_INITIAL_INSPECTIONS > 0) |>
+  mutate(SEVERITY_RANK = min_rank(data.frame(
+    high = -AVG_INITIAL_HIGH, medium = -AVG_INITIAL_MEDIUM, low = -AVG_INITIAL_LOW
+  ))) |>
+  arrange(SEVERITY_RANK, id)
+stopifnot(nrow(inspections) > 0, nrow(initial_yearly) > 0)
+fmt <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+period_start <- min(inspections$inspect_dt)
+period_end <- max(inspections$inspect_dt)
+severity_top <- head(inspections$encounter, 20)
+weighted_top <- inspections |>
+  arrange(desc(KNOWN_SEVERITY_SCORE), desc(inspect_dt), encounter) |>
+  slice_head(n = 20)
+alternative_top <- inspections |>
+  arrange(desc(3 * NUM_HIGH + 2 * NUM_MEDIUM + NUM_LOW), desc(inspect_dt), encounter) |>
+  slice_head(n = 20)
 
 ```
 
@@ -60,69 +108,56 @@ yearly <- read.csv("out/violations_by_year.csv") |>
 
 # Introduction
 
-From 2014-2025, there were 404,513 health code violations across 90,066 inspections in Western PA. In 2025 alone, there were 28,777 violations across 5,034 inspections.
+This analysis covers **Allegheny County**, not all of Western Pennsylvania. The local historical exports span `r min(all_inspections$inspect_dt)` through `r max(all_inspections$inspect_dt)`. The 2025 results cover **`r period_start` through `r period_end`**, with `r fmt(nrow(inspections))` inspection encounters and `r fmt(sum(inspections$NUM_VIOLATION_CATEGORIES))` recorded violation-category rows. This is a partial-year analysis, not a complete 2025 ranking.
 
-Although the data is available to the public, there lacks a clear way to view a summary of which restaurants had the most violations other than individually downloading each inspection report. And even then, there are codes on these reports that are not clearly explained.
+As a local data scientist, I wanted to make these public records easier to compare while preserving the severity information recorded by inspectors. This ranking is my analytical summary, not an official Health Department grade or an estimate of the probability of foodborne illness.
 
-As a local data scientist, I thought it would fun to come up with a ranking system. There are 33 different violation categories that fall into low, medium, or high risk (median risk was used for violations that can vary in seriousness). The following weights were determined:
+## What the Health Department's categories mean
 
-| VIOLATION | RISK | RISK_SCORE |
-|:------------|------|-----------:|
-| Certified Food Protection Manager | HIGH | 5 |
-| Handwashing Facilities | HIGH | 5 |
-| Hot Holding Temperatures | MED | 3 |
-| Pest Management | MED | 3 |
-| Cross-Contamination Prevention | MED-LOW | 2 |
-| Cold Holding Temperatures | MED | 3 |
-| Probe-Type Thermometers | LOW | 1 |
-| Cleaning and Sanitization | MED | 3 |
-| Toxic Items | HIGH | 5 |
-| Plumbing | HIGH | 5 |
-| Consumer Advisory | HIGH | 5 |
-| Facilities to Maintain Temperature | HIGH | 5 |
-| Employee Personal Hygiene | MED | 3 |
-| Food Source/Condition | MED | 3 |
-| Waste Water Disposal | HIGH | 5 |
-| Cooling Food | MED | 3 |
-| Water Supply | HIGH | 5 |
-| Demonstration of Knowledge | HIGH | 5 |
-| Date Marking of Food | HIGH | 5 |
-| Reheating Temperatures | MED | 3 |
-| Employee Health | MED-LOW | 2 |
-| Cooking Temperatures | MED  | 3 |
-| Contamination Prevention - Food, Utensils and Equipment | HIGH-MED | 4 |
-| Toilet Room | HIGH-MED | 4 |
-| Garbage and Refuse | HIGH-MED | 4 |
-| Administrative | HIGH-MED | 4 |
-| Fabrication, Design, Installation and Maintenance | HIGH-MED | 4 |
-| Ventilation | HIGH-MED | 4 |
-| Lighting | HIGH-MED | 4 |
-| Floors | HIGH-MED | 4 |
-| Walls and ceilings | HIGH-MED | 4 |
-| Dressing rooms and Locker rooms | HIGH-MED | 4 |
-| General Premises | HIGH-MED | 4 |
+The [Allegheny County Health Department (ACHD)](https://www.alleghenycounty.us/Services/Health-Department/Food-Safety/Search-Inspection-Reports) describes three severity levels:
 
-Full dataset available at:
-https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations
+| Severity | Meaning | Examples on ACHD's page |
+|:---|:---|:---|
+| High | Can directly lead to foodborne illness | Unsafe holding/cooking temperatures; improper employee handwashing |
+| Medium | Can increase the chance of foodborne illness | No soap at handwashing sinks; no food probe thermometer; no Certified Food Protection Manager present |
+| Low | Usually does not cause foodborne illness on its own; concerns cleanliness, safety, or maintenance | Damaged floors, poorly maintained ventilation hoods, poor lighting |
+
+These are examples, not a fixed severity lookup for all findings in a category. The original ranking assigned floors and lighting 4 points, a missing manager 5, and thermometers 1; those assignments did not reflect the recorded severity. The revised analysis uses the CSV's **`high`, `medium`, and `low` flags for each inspection/category**, rather than guessing from `description_new`.
+
+## Counting and ranking rules
+
+1. **Only `rating = V` is a violation.** Other assessment rows are excluded even if severity flags remain populated. For example, the [Party Cake Shop report of February 19, 2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202502190003) lists eight violation categories; its CSV also has a non-violation thermometer row. The revised pipeline counts eight, not nine.
+2. **Count categories, not individual findings.** Each row is an inspection/category pair; one category can describe several problems. When multiple severity flags are true, assign that category its highest recorded severity (high, then medium, then low). Thus H, M, and L below are mutually exclusive category counts and may differ from the report's counts of all checked severity boxes.
+3. **Keep unclassified violations visible.** A `V` row with no true severity flag is unclassified (U), not low risk or a zero-risk finding. H + M + L + U equals the number of violation categories. In this period, `r fmt(sum(inspections$NUM_UNCLASSIFIED))` categories are unclassified across `r fmt(sum(inspections$NUM_UNCLASSIFIED > 0))` encounters. Rankings based on known severities may understate those encounters.
+4. **Primary ranking: H, then M, then L, descending.** More high-severity categories rank ahead of any number of lower-severity categories. This is an explicit analytical choice to prioritize severity; ACHD does not prescribe this ordering of facilities. Identical H/M/L profiles share a rank. Dates and encounter IDs only stabilize display order; a top-20 display can cut a tie.
+5. **Secondary score: 5H + 3M + L.** These are analyst-selected weights, not ACHD weights or measured risk ratios. The **known-severity score** omits unclassified categories and is incomplete wherever U > 0. It measures recorded category burden, not safety. No median or quartile is labeled a “clean” or “acceptable” threshold.
+
+## Comparison population and data quality
+
+- Link the historical inspection and violation exports by **`encounter`**, and group facilities by **`id`**. Names and street addresses are display labels, not identifiers. Separate encounters on the same date remain separate inspections.
+- Include encounters from the inspection export even when there are no matching `V` rows. There are `r fmt(sum(inspections$NUM_VIOLATION_CATEGORIES == 0))` such encounters in this period. “Zero recorded violations” is a database result, not proof that every condition was assessed or satisfactory.
+- Compare facilities primarily using the mean H/M/L profile of visits whose purpose is exactly **“Initial.”** Reinspections, complaints, new-facility visits, and mixed-purpose encounters can have different scopes. All-encounter averages remain descriptive context. Even Initial visits are not a random or fully standardized sample, and facilities with one visit have limited evidence.
+- Restrict processing to the overlapping observed date range of the two exports. This guards against treating later inspections as clean when the violation feed ends earlier; it cannot prove that either export is complete within that range.
+- Exclude explicit training-client names by facility ID and export the exclusion list for review. Retain legitimate names such as “Latest Scoop” and “Getgo Corporate Office & Test Kitchen.” Duplicate encounter/category rows, invalid severity flags, and unmatched inspection metadata stop processing instead of silently changing rankings.
+
+The [WPRDC dataset](https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations) provides both historical exports. ACHD says it changed software on **August 11, 2025**; later reports are available through [Citizens Access](https://aca-prod.accela.com/ALLEGHENYCO/Cap/CapHome.aspx?module=EnvHealth&TabName=Home). The local violation export ends before that transition. Historical report links and inspection placards describe those visits, not a facility's current status.
 
 \pagebreak
 
 # Stats for Nerds
 
-Distribution of calculated risk scores for all inspections:
+Distribution of known-severity scores for all recorded inspection encounters in the available 2025 period, including zero-recorded-violation visits:
 
 ```{r}
-ggplot(inspections, aes(x = TOTAL_RISK_SCORE)) +
-  geom_histogram(aes(y = after_stat(density)),
-                 bins = 30,
+ggplot(inspections, aes(x = KNOWN_SEVERITY_SCORE)) +
+  geom_histogram(binwidth = 2, boundary = -0.5,
                  fill = "#69b3a2",
                  color = "white",
                  alpha = 0.8) +
-  geom_density(color = "#1f4e79", linewidth = 1.2) +
   labs(
-    title = "West PA Health Inspection Risk Scores",
-    x = "Total Risk Score",
-    y = "Density"
+    title = "Allegheny County Recorded Inspection Scores, Jan-Jul 2025",
+    x = "Known-severity score (5H + 3M + L)",
+    y = "Inspection encounters"
   ) +
   theme_minimal(base_size = 12)
 ```
@@ -131,218 +166,192 @@ ggplot(inspections, aes(x = TOTAL_RISK_SCORE)) +
 ```{r}
 pct_tbl <- inspections |>
   summarise(
-    Min = min(TOTAL_RISK_SCORE),
-    Q1 = quantile(TOTAL_RISK_SCORE, 0.25),
-    Median = quantile(TOTAL_RISK_SCORE, 0.50),
-    Avg = mean(TOTAL_RISK_SCORE),
-    Q3 = quantile(TOTAL_RISK_SCORE, 0.75),
-    Max = max(TOTAL_RISK_SCORE)
+    Min = min(KNOWN_SEVERITY_SCORE),
+    Q1 = quantile(KNOWN_SEVERITY_SCORE, 0.25),
+    Median = median(KNOWN_SEVERITY_SCORE),
+    Mean = mean(KNOWN_SEVERITY_SCORE),
+    Q3 = quantile(KNOWN_SEVERITY_SCORE, 0.75),
+    Max = max(KNOWN_SEVERITY_SCORE)
   ) |>
-  pivot_longer(cols = everything(),
-                      names_to = "Percentile",
-                      values_to = "RiskScore")
+  tidyr::pivot_longer(everything(), names_to = "Statistic", values_to = "Score")
 
-kable(pct_tbl, digits = 2, caption = "Risk Score Percentiles")
+kable(pct_tbl, digits = 2, caption = "Known-severity score summary (all purposes)")
 ```
 
-The distribution of inspection scores is highly skewed.
-
-
-To be fair to restaurants who scored better upon reinspection, I also analyze the average risk score across all inspections in 2025.
+For facility comparisons, use only Initial inspections and retain zero-recorded-violation visits in the denominator. This distribution gives each facility one observation: its mean known-severity score over its Initial inspections in the available period.
 
 ```{r}
-ggplot(yearly, aes(x = AVG_RISK_SCORE)) +
-  geom_histogram(aes(y = after_stat(density)),
-                 bins = 30,
+ggplot(initial_yearly, aes(x = AVG_INITIAL_SCORE)) +
+  geom_histogram(binwidth = 2, boundary = -0.5,
                  fill = "#69b3a2",
                  color = "white",
                  alpha = 0.8) +
-  geom_density(color = "#1f4e79", linewidth = 1.2) +
   labs(
-    title = "West PA Average Health Inspection Risk Score 2025",
-    x = "Total Risk Score",
-    y = "Density"
+    title = "Facility Mean Scores on Initial Inspections, Jan-Jul 2025",
+    x = "Mean known-severity score (5H + 3M + L)",
+    y = "Facilities"
   ) +
   theme_minimal(base_size = 12)
 ```
 
 
 ```{r}
-pct_tbl <- yearly |>
+pct_tbl <- initial_yearly |>
   summarise(
-    Min = min(AVG_RISK_SCORE),
-    Q1 = quantile(AVG_RISK_SCORE, 0.25),
-    Median = quantile(AVG_RISK_SCORE, 0.50),
-    Avg = mean(AVG_RISK_SCORE),
-    Q3 = quantile(AVG_RISK_SCORE, 0.75),
-    Max = max(AVG_RISK_SCORE)
+    Min = min(AVG_INITIAL_SCORE),
+    Q1 = quantile(AVG_INITIAL_SCORE, 0.25),
+    Median = median(AVG_INITIAL_SCORE),
+    Mean = mean(AVG_INITIAL_SCORE),
+    Q3 = quantile(AVG_INITIAL_SCORE, 0.75),
+    Max = max(AVG_INITIAL_SCORE)
   ) |>
-  pivot_longer(cols = everything(),
-                      names_to = "Percentile",
-                      values_to = "RiskScore")
+  tidyr::pivot_longer(everything(), names_to = "Statistic", values_to = "Score")
 
-kable(pct_tbl, digits = 2, caption = "Average Risk Score Percentiles")
+kable(pct_tbl, digits = 2, caption = "Facility mean score summary (Initial inspections only)")
 ```
 
-A very similar distribution is observed for average health inspection score.
+## Sensitivity to the ranking method
 
-I would consider the median score of 19 as the 'clean' threshold, and the Q3 of 32 to be the 'acceptable' threshold.
+The severity-first and 5/3/1 weighted top-20 inspection lists share **`r length(intersect(severity_top, weighted_top$encounter))` of 20** encounters. Changing the weights to 3/2/1 retains **`r length(intersect(weighted_top$encounter, alternative_top$encounter))` of 20** encounters from the 5/3/1 list. These are descriptive sensitivity checks with deterministic tie-breaking, not statistical confidence measures. The main severity-first ranking does not depend on numerical weights.
 
-Now without further ado
+# 2025 Rankings: Available January–July Period
 
-# WALL OF SHAME 2025
+Click a facility name for the linked historical report. **H/M/L** are category counts at the highest recorded severity; **U** is the number of unclassified categories. The tables describe recorded conditions during this period, not current operating conditions.
 
-Click on the food facility name in the below table to view the full health inspection report. In the tables summarized by year the most recent inspection is linked.
-
-```{r}
- inspections |>
-  arrange(desc(TOTAL_RISK_SCORE)) |>
-  head(20) |>
-  mutate(
-    name = paste0("\\href{", REPORT,"}{", name, "}")
-  ) |>
-  select(-REPORT) |>
-  kable(caption = "Top 20 inspections by risk score", format = "latex",
-      col.names = c("Location", "Date", "Risk Score", "Num Violations", "Num High Risk"), 
-      escape = FALSE, booktabs = TRUE) |>
-  kable_paper(latex_options = "striped", full_width = TRUE) |>
-  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
-```
+## Inspections ranked by recorded severity
 
 ```{r}
 inspections |>
-  arrange(desc(NUM_HIGH), desc(TOTAL_RISK_SCORE)) |>
-  head(20) |>
-  mutate(
-    name = paste0("\\href{", REPORT,"}{", name, "}")
-  ) |>
-  select(-REPORT) |>
-  kable(caption = "Top 20 inspections by number of high risk violations", format = "latex",
-    col.names = c("Location", "Date", "Risk Score", "Num Violations", "Num High Risk"), 
-    escape = FALSE, booktabs = TRUE) |>
-  kable_paper(latex_options = "striped", full_width = TRUE) |>
-  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
+  slice_head(n = 20) |>
+  select(name, Rank = SEVERITY_RANK, Date = inspect_dt, Purpose = purpose,
+         H = NUM_HIGH, M = NUM_MEDIUM, L = NUM_LOW, U = NUM_UNCLASSIFIED, REPORT) |>
+  report_table("Top 20 inspection encounters by H, then M, then L")
 ```
 
+## Secondary view: weighted category burden
+
+This list allows several lower-severity categories to outweigh a higher-severity category. It answers a different question from the main ranking. The score is incomplete when U > 0.
+
 ```{r}
-yearly |>
-  arrange(desc(AVG_RISK_SCORE)) |>
-  head(20) |>
-  mutate(
-    name = paste0("\\href{", REPORT,"}{", name, "}")
-  ) |>
-  select(-REPORT) |>
-  kable(caption = "Top 20 restaurants by average risk score in 2025", digits = 2, format = "latex",
-    col.names = c("Location", "Year", "Risk Score", "Num Inspections", "Average Risk", "Num Violations"), 
-    escape = FALSE, booktabs = TRUE) |>
-  kable_paper(latex_options = "striped", full_width = TRUE) |>
-  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
+weighted_top |>
+  select(name, Date = inspect_dt, Purpose = purpose, Score = KNOWN_SEVERITY_SCORE,
+         H = NUM_HIGH, M = NUM_MEDIUM, L = NUM_LOW, U = NUM_UNCLASSIFIED, REPORT) |>
+  report_table("Top 20 encounters by known-severity score (5H + 3M + L)")
 ```
 
+## Facilities ranked using Initial inspections
+
+Order facilities by mean H, then mean M, then mean L across Initial inspections only. **N** is the number of those inspections; **U** is their total unclassified category count. A high mean based on N = 1 does not establish a pattern of repeated problems. Links go to each facility's latest recorded encounter in the period, which may be a reinspection rather than an Initial visit.
 
 ```{r}
-yearly |>
-  arrange(desc(NUM_INSPECTIONS), desc(AVG_RISK_SCORE)) |>
-  head(20) |>
-  mutate(
-    name = paste0("\\href{", REPORT,"}{", name, "}")
-  ) |>
-  select(-REPORT) |>
-  kable(caption = "Top 20 restaurants by number of inspections in 2025", digits = 2, format = "latex",
-    col.names = c("Location", "Year", "Risk Score", "Num Inspections", "Average Risk", "Num Violations"), 
-    escape = FALSE, booktabs = TRUE) |>
-  kable_styling(latex_options = "striped") |>
-  kable_paper(latex_options = "striped", full_width = TRUE) |>
-  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
+initial_yearly |>
+  slice_head(n = 20) |>
+  select(name, Rank = SEVERITY_RANK, N = NUM_INITIAL_INSPECTIONS,
+         `Mean H` = AVG_INITIAL_HIGH, `Mean M` = AVG_INITIAL_MEDIUM,
+         `Mean L` = AVG_INITIAL_LOW, U = NUM_INITIAL_UNCLASSIFIED, REPORT) |>
+  report_table("Top 20 facilities by mean Initial-inspection severity profile", digits = 2)
 ```
 
+## Follow-up context for those facilities
+
+For the same facilities, **N** counts all encounter purposes and **Mean** is the all-encounter mean known-severity score, including zero-recorded-violation visits. **Latest** is the score for the linked encounter; **U** is its unclassified category count. The mean also omits unclassified categories on earlier visits; their totals are retained in the CSV. A lower follow-up score can reflect corrections or a narrower inspection scope, so it does not prove that all previous problems were resolved.
+
 ```{r}
-yearly |>
-  arrange(desc(TOTAL_VIOLATIONS), desc(AVG_RISK_SCORE)) |>
-  head(20) |>
-  mutate(
-    name = paste0("\\href{", REPORT,"}{", name, "}")
-  ) |>
-  select(-REPORT) |>
-  kable(caption = "Top 20 restaurants by total violations in 2025", digits = 2, format = "latex",
-    col.names = c("Location", "Year", "Risk Score", "Num Inspections", "Average Risk", "Num Violations"), 
-    escape = FALSE, booktabs = TRUE) |>
-  kable_paper(latex_options = "striped", full_width = TRUE) |>
-  column_spec(1, width = "5cm", latex_column_spec = "p{5cm}")
+initial_yearly |>
+  slice_head(n = 20) |>
+  select(name, N = NUM_INSPECTIONS, Mean = AVG_KNOWN_SEVERITY_SCORE,
+         Date = LATEST_INSPECTION_DATE, Purpose = LATEST_PURPOSE,
+         Latest = LATEST_KNOWN_SEVERITY_SCORE, U = LATEST_NUM_UNCLASSIFIED, REPORT) |>
+  report_table("All-encounter and latest-visit context for the facilities above", digits = 2)
 ```
 
 
 # Discussion
 
-Just from skimming some of these reports, here's some of my favorite excerpts:
+The category summaries cannot convey all the detail in an inspector's narrative. Here are selected excerpts from the historical reports, including corrections made during the visits:
 
-**Lucca Ristorante & Wine Bar, Craig St, 07/01/2025:**
+**[Lucca Ristorante & Wine Bar, Craig St, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010017):**
 
-- There are bottles of liquor stored beneath and contaminated by an unknown water source from 
-the active ceiling leak behind the bar. The operator voluntarily moved the affected bottles to a safe 
+- There are bottles of liquor stored beneath and contaminated by an unknown water source from
+the active ceiling leak behind the bar. The operator voluntarily moved the affected bottles to a safe
 storage location and discontinued service behind the bar.
 
-**The Library, Carson St, 03/08/2025:**
+**[The Library, Carson St, 03/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180056):**
 
 -  Numerous rodent droppings [in 6 areas]... Nesting material was identified [in 4 areas]... Loose bait found in kitchen and basement.
 
-- Black mold-like substance and a pink biofilm was identified on the ice machine deflector plate 
-and surrounding areas. 
+- Black mold-like substance and a pink biofilm was identified on the ice machine deflector plate
+and surrounding areas.
 
 - Oyster and chicken breading preparation cooler interior has excessive amounts of old food debris.
 
-- It was discovered that the dish machine is not functioning properly and is failing to sanitize 
-effectively. The chlorine readout measured at 0.00 PPM. Owner initiated a phone call for repairs. 
+- It was discovered that the dish machine is not functioning properly and is failing to sanitize
+effectively. The chlorine readout measured at 0.00 PPM. Owner initiated a phone call for repairs.
 
-**Zen Asian Diner, Butler St, 07/14/2025**
+**[Zen Asian Diner, Butler St, 07/14/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140064)**
 
-- In basement, there is a decayed corpse of an animal, about the size of a possum or large rat. 
+- In basement, there is a decayed corpse of an animal, about the size of a possum or large rat.
 Unable to determine the type of animal during inspection.
 
 - Too many flies to count found throughout all food preparation areas of entire facility.
 
-- The garage that holds the dumpster and grease receptacle has a door that leads directly into the 
+- The garage that holds the dumpster and grease receptacle has a door that leads directly into the
 food preparation room and that door does not seal.
 
 *REPEAT VIOLATIONS*
 
-**Fun Asian Bistro, Frankstown Rd, 07/01/2025**
+**[Fun Asian Bistro, Frankstown Rd, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010031)**
 
-- Did not observe any employee handwashing during inspection. 
+- Did not observe any employee handwashing during inspection.
 
 - Employee observed eating on cookline.
 
-- Temperature/Time Controlled for Safety (TCS) foods such as tofu, beef, chicken, cooked noodles, 
-and cooked rice were found between 45-55F in the two-door and three-door prep coolers. All foods 
-discarded. 
+- Temperature/Time Controlled for Safety (TCS) foods such as tofu, beef, chicken, cooked noodles,
+and cooked rice were found between 45-55F in the two-door and three-door prep coolers. All foods
+discarded.
 
-- Cooked chicken by grill had a temperature of 75F. Owner says it was cooked this morning. 
+- Cooked chicken by grill had a temperature of 75F. Owner says it was cooked this morning.
 Discarded during inspection. *REPEAT VIOLATION*
 
 \pagebreak
 
-**Hastina Royal Indian Cuisine, Park Manor Boulevard, 06/11/2025**
+**[Hastina Royal Indian Cuisine, Park Manor Boulevard, 06/11/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506110018)**
 
-- Facility is open and operating without a valid health permit. 
+- Facility is open and operating without a valid health permit.
 
 - Facility failed to submit plans for a change of ownership and transfer of a sister LLC.
 
 - Consumer alert administered during inspection due to several high and medium risk violations.
 
 
-**The Mintt, Banksville Rd, 04/21/2025**
+**[The Mintt, Banksville Rd, 04/21/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210035)**
 
-- In the walk-in cooler, a container of raw lamb was observed stored behind a loosely covered bowl 
+- In the walk-in cooler, a container of raw lamb was observed stored behind a loosely covered bowl
 of dough. Blood was observed to have dripped onto the plastic wrap covering a bowl of pudding.
 
 ---
 
-Health inspections are merely a snapshot of how a restaurant is operating at a specific point in time, not a permanent verdict. Most violations are trivial mistakes that we could make in our own kitchen. However, if serious violations are repeated then restaurants should be held accountable. Stay informed and grab the inspection report before hitting the buffet. 
+Health inspections are a snapshot of how a food facility is operating at a specific point in time, not a permanent verdict. Severity, inspection scope, and follow-up findings matter more than a single league-table position. Read the full report and check recent inspections before drawing conclusions about a facility today.
 
-Questions and suggestions on my methodology are welcome. Thanks for reading! 
+Questions and suggestions on my methodology are welcome. Thanks for reading!
 
 [Source code](https://github.com/Elkip/West-PA-Health-Inspection-Analysis/tree/master)
 
-[Google Sheets With All Data](https://docs.google.com/spreadsheets/d/14fzHPMQwi2yXgINs_aTp1Vy-1ni_tRFI3wfmFX-IPXc)
+[Original Google Sheets export (may use the earlier methodology)](https://docs.google.com/spreadsheets/d/14fzHPMQwi2yXgINs_aTp1Vy-1ni_tRFI3wfmFX-IPXc)
 
-#### Written by a human, with no use of AI <3
+# Reproducing the Analysis
+
+Use R 4.1 or later with `dplyr` (1.1.0 or later), `tidyr`, `ggplot2`, and `knitr`. Packages must be built for a compatible version of R. From the repository root:
+
+1. Save the [historical violation export](https://data.wprdc.org/datastore/dump/1a1329e2-418c-4bd3-af2c-cc334e7559af) as `data/violations.csv` and the matching [historical inspection export](https://data.wprdc.org/datastore/dump/4ea730d8-2bf9-4783-b0a5-b41ed687097e) as `data/inspections.csv`. Both resources are labeled 2014–2025 on WPRDC. The newer inspection feed uses a different schema.
+2. Run `Rscript clean_inspections.r` to generate the summaries in `out/`.
+3. Run `Rscript tests/test_inspection_analysis.R` to check scoring and aggregation, including two comparisons with original inspection PDFs when the local exports are available.
+4. Run `Rscript render_readme.r` to regenerate `README.md` and its plots from this document. For a PDF, install Quarto and a TeX distribution and run `quarto render 2025_hall_of_shame.qmd --to pdf`.
+
+Generated files:
+
+- `out/violations_by_inspection.csv`: all encounters in the shared export window, purpose, severity counts, unclassified counts, known-severity score, and `SCORE_COMPLETE` (whether every recorded violation category has a severity).
+- `out/violations_by_year.csv`: facility/year summaries, Initial-only and all-encounter means, denominators, and latest-report context within each year. The 2025 rows cover only the available period.
+- `out/category_severity_audit.csv`: recorded severity distribution for each category across the shared historical window.
+- `out/coverage.csv`: date bounds and record counts after training-client exclusions.
+- `out/excluded_training_facilities.csv`: excluded facility identifiers and names.
