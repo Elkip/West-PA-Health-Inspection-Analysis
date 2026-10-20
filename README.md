@@ -86,6 +86,34 @@ Table: Facility mean score summary (Initial inspections only)
 
 The severity-first and 5/3/1 weighted top-20 inspection lists share **12 of 20** encounters. Changing the weights to 3/2/1 retains **18 of 20** encounters from the 5/3/1 list. These are descriptive sensitivity checks with deterministic tie-breaking, not statistical confidence measures. The main severity-first ranking does not depend on numerical weights.
 
+# A Visual Tour of the Findings
+
+## Inspection activity and scope
+
+Inspection volume and purpose provide context for the rankings. The chart counts every recorded encounter, including visits with no recorded violations. “Follow-up” includes the exact purposes Reinspection and Partial ReInspection; mixed-purpose visits are grouped with other visits. These monthly counts describe activity, not a trend in restaurant safety.
+
+<img src="2025_hall_of_shame_markdown_files/figure-commonmark/inspection-calendar-1.png" alt="Monthly stacked columns showing Initial, follow-up, and other inspection encounters from January through July 2025."  />
+
+## Why category names alone cannot determine severity
+
+Each row below shows the severity mix within one of the 15 most frequently cited categories. A darker cell means a larger share of that category's violation records, not a more dangerous category. The variation is why this analysis uses the inspector's recorded flags instead of assigning every occurrence of a category the same severity.
+
+<img src="2025_hall_of_shame_markdown_files/figure-commonmark/category-severity-1.png" alt="Heatmap of the 15 most frequently cited categories, showing percentages classified as high, medium, low, or unclassified."  />
+
+## The composition behind the ranking
+
+The bars below show the mean number of categories at each severity for the top 15 facilities in the Initial-only ranking. Facilities are ordered by their severity profile, not by total bar length. The annotations retain the inspection denominator and the number of unclassified categories so the limits of each comparison remain visible.
+
+<img src="2025_hall_of_shame_markdown_files/figure-commonmark/facility-severity-profiles-1.png" alt="Horizontal stacked bars showing mean high-, medium-, and low-severity category counts for the 15 highest-ranked facilities on Initial inspections."  />
+
+## What happens at the next recorded follow-up?
+
+Match an Initial visit to the very next recorded encounter for the same facility only when that encounter is a Reinspection or Partial ReInspection on a later date. Keep the earliest eligible pair per facility within the available 2025 period, then exclude pairs with unclassified categories at either visit. This is chronological matching, not a verified administrative link between reports. Same-day pairs are excluded because the analysis does not use visit times.
+
+Below the diagonal, the follow-up score is lower than the Initial score. Bubble area represents the number of facilities at the same coordinates. These facilities are a selected group that received follow-up visits; changes can reflect both corrections and narrower follow-up scope. Facilities without an eligible observed follow-up, including those near the July cutoff, do not appear.
+
+<img src="2025_hall_of_shame_markdown_files/figure-commonmark/followup-comparison-1.png" alt="Bubble scatterplot comparing Initial and next recorded follow-up scores, with a diagonal reference line for unchanged scores."  />
+
 # 2025 Rankings: Available January–July Period
 
 Click a facility name for the linked historical report. **H/M/L** are category counts at the highest recorded severity; **U** is the number of unclassified categories. The tables describe recorded conditions during this period, not current operating conditions.
@@ -279,17 +307,17 @@ Questions and suggestions on my methodology are welcome. Thanks for reading!
 
 # Reproducing the Analysis
 
-Use R 4.1 or later with `dplyr` (1.1.0 or later), `tidyr`, `ggplot2`, and `knitr`. Packages must be built for a compatible version of R. From the repository root:
+Use R 4.1 or later with `dplyr` (1.1.0 or later), `tidyr`, `ggplot2`, `stringr`, `scales`, and `knitr`. Packages must be built for a compatible version of R. From the repository root:
 
 1. Save the [historical violation export](https://data.wprdc.org/datastore/dump/1a1329e2-418c-4bd3-af2c-cc334e7559af) as `data/violations.csv` and the matching [historical inspection export](https://data.wprdc.org/datastore/dump/4ea730d8-2bf9-4783-b0a5-b41ed687097e) as `data/inspections.csv`. Both resources are labeled 2014–2025 on WPRDC. The newer inspection feed uses a different schema.
 2. Run `Rscript clean_inspections.r` to generate the summaries in `out/`.
-3. Run `Rscript tests/test_inspection_analysis.R` to check scoring and aggregation, including two comparisons with original inspection PDFs when the local exports are available.
+3. Run `Rscript tests/test_inspection_analysis.R` to check scoring and aggregation, including two comparisons with original inspection PDFs when the local exports are available. Run `Rscript tests/test_followup_matching.R` to check the follow-up chart's matching rules.
 4. Run `Rscript render_readme.r` to regenerate `README.md` and its plots from this document. For a PDF, install Quarto and a TeX distribution and run `quarto render 2025_hall_of_shame.qmd --to pdf`.
 
 Generated files:
 
 - `out/violations_by_inspection.csv`: all encounters in the shared export window, purpose, severity counts, unclassified counts, known-severity score, and `SCORE_COMPLETE` (whether every recorded violation category has a severity).
 - `out/violations_by_year.csv`: facility/year summaries, Initial-only and all-encounter means, denominators, and latest-report context within each year. The 2025 rows cover only the available period.
-- `out/category_severity_audit.csv`: recorded severity distribution for each category across the shared historical window.
+- `out/category_severity_audit.csv`: recorded severity distribution by category and year across the shared historical window; the visualizations use only 2025.
 - `out/coverage.csv`: date bounds and record counts after training-client exclusions.
 - `out/excluded_training_facilities.csv`: excluded facility identifiers and names.

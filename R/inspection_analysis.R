@@ -168,7 +168,8 @@ build_inspection_summaries <- function(violations, inspections) {
     )
 
   category_audit <- scored |>
-    count(description_new, severity, name = "NUM_CATEGORIES")
+    mutate(inspect_yr = as.integer(format(inspect_dt, "%Y"))) |>
+    count(inspect_yr, description_new, severity, name = "NUM_CATEGORIES")
   coverage <- data.frame(
     COVERAGE_START = coverage_start, COVERAGE_END = coverage_end,
     NUM_INSPECTIONS = nrow(by_inspection),
