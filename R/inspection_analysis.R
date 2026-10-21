@@ -133,12 +133,17 @@ build_inspection_summaries <- function(violations, inspections) {
         ", ", coalesce(city, "")
       ),
       inspect_yr = as.integer(format(inspect_dt, "%Y")),
-      REPORT = paste0(
-        "https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=", encounter
+      REPORT = case_when(
+        grepl("^FSP-", id) ~ paste0(
+          "https://aca-prod.accela.com/ALLEGHENYCO/Cap/CapHome.aspx?module=EnvHealth&TabName=Home"
+        ),
+        .default = paste0(
+          "https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=", encounter
+        )
       ),
       KNOWN_SEVERITY_SCORE = 5 * NUM_HIGH + 3 * NUM_MEDIUM + NUM_LOW,
       SCORE_COMPLETE = NUM_UNCLASSIFIED == 0,
-      IS_INITIAL = !is.na(purpose) & purpose == "Initial"
+      IS_INITIAL = !is.na(purpose) & purpose %in% c("Initial", "Comprehensive")
     ) |>
     arrange(inspect_dt, encounter)
 

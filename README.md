@@ -1,6 +1,6 @@
 # Allegheny County Food Inspection Analysis 2025
 
-Ranking Recorded Violations in the Available January–July Data
+Ranking Recorded Violations in the Available 2025 Data
 
 Mitchell Henschel
 
@@ -11,7 +11,7 @@ Mitchell Henschel
 
 # Introduction
 
-This analysis covers **Allegheny County**, not all of Western Pennsylvania. The local historical exports span 2014-01-02 through 2025-07-31. The 2025 results cover **2025-01-02 through 2025-07-31**, with 6,184 inspection encounters and 28,430 recorded violation-category rows. This is a partial-year analysis, not a complete 2025 ranking.
+This analysis covers **Allegheny County**, not all of Western Pennsylvania. The combined local exports and scraped Accela PDF reports span 2014-01-02 through 2026-10-20. The 2025 results cover **2025-01-02 through 2025-08-29**, with 6,188 inspection encounters and 28,441 recorded violation-category rows.
 
 As a local data scientist, I wanted to make these public records easier to compare while preserving the severity information recorded by inspectors. This ranking is my analytical summary, not an official Health Department grade or an estimate of the probability of foodborne illness.
 
@@ -37,13 +37,13 @@ These are examples, not a fixed severity lookup for all findings in a category. 
 
 ## Comparison population and data quality
 
-- Link the historical inspection and violation exports by **`encounter`**, and group facilities by **`id`**. Names and street addresses are display labels, not identifiers. Separate encounters on the same date remain separate inspections.
-- Include encounters from the inspection export even when there are no matching `V` rows. There are 1,161 such encounters in this period. “Zero recorded violations” is a database result, not proof that every condition was assessed or satisfactory.
-- Compare facilities primarily using the mean H/M/L profile of visits whose purpose is exactly **“Initial.”** Reinspections, complaints, new-facility visits, and mixed-purpose encounters can have different scopes. All-encounter averages remain descriptive context. Even Initial visits are not a random or fully standardized sample, and facilities with one visit have limited evidence.
+- Link the inspection and violation exports by **`encounter`**, and group facilities by **`id`**. Names and street addresses are display labels, not identifiers. Separate encounters on the same date remain separate inspections.
+- Include encounters from the inspection export even when there are no matching `V` rows. There are 1,162 such encounters in this period. “Zero recorded violations” is a database result, not proof that every condition was assessed or satisfactory.
+- Compare facilities primarily using the mean H/M/L profile of routine visits whose purpose is **“Initial”** (or **“Comprehensive”** in the new Accela system). Reinspections, complaints, new-facility visits, and mixed-purpose encounters can have different scopes. All-encounter averages remain descriptive context. Even Initial/Comprehensive visits are not a random or fully standardized sample, and facilities with one visit have limited evidence.
 - Restrict processing to the overlapping observed date range of the two exports. This guards against treating later inspections as clean when the violation feed ends earlier; it cannot prove that either export is complete within that range.
 - Exclude explicit training-client names by facility ID and export the exclusion list for review. Retain legitimate names such as “Latest Scoop” and “Getgo Corporate Office & Test Kitchen.” Duplicate encounter/category rows, invalid severity flags, and unmatched inspection metadata stop processing instead of silently changing rankings.
 
-The [WPRDC dataset](https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations) provides both historical exports. ACHD says it changed software on **August 11, 2025**; later reports are available through [Citizens Access](https://aca-prod.accela.com/ALLEGHENYCO/Cap/CapHome.aspx?module=EnvHealth&TabName=Home). The local violation export ends before that transition. Historical report links and inspection placards describe those visits, not a facility's current status.
+The [WPRDC dataset](https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations) provides both historical exports through July 2025. ACHD changed software on **August 11, 2025**; later reports are available as PDF attachments through [Citizens Access](https://aca-prod.accela.com/ALLEGHENYCO/Cap/CapHome.aspx?module=EnvHealth&TabName=Home) and are extracted into the combined dataset via `scraper/scrape_pdfs.py`. Historical report links and inspection placards describe those visits, not a facility's current status.
 
 
 # Stats for Nerds
@@ -65,13 +65,13 @@ Table: Known-severity score summary (all purposes)
 |Q3        | 12.00|
 |Max       | 59.00|
 
-For facility comparisons, use only Initial inspections and retain zero-recorded-violation visits in the denominator. This distribution gives each facility one observation: its mean known-severity score over its Initial inspections in the available period.
+For facility comparisons, use only Initial/Comprehensive inspections and retain zero-recorded-violation visits in the denominator. This distribution gives each facility one observation: its mean known-severity score over its Initial/Comprehensive inspections in the available period.
 
 ![](2025_hall_of_shame_markdown_files/figure-commonmark/unnamed-chunk-4-1.png)<!-- -->
 
 
 
-Table: Facility mean score summary (Initial inspections only)
+Table: Facility mean score summary (Initial/Comprehensive inspections only)
 
 |Statistic | Score|
 |:---------|-----:|
@@ -88,11 +88,13 @@ The severity-first and 5/3/1 weighted top-20 inspection lists share **12 of 20**
 
 # A Visual Tour of the Findings
 
+The HTML report adds hover details, zoom controls, and clickable follow-up bubbles. Render it with `quarto render 2025_hall_of_shame.qmd --to html` and open `2025_Health_Inspections_Interactive.html` in a browser. GitHub's README preview and the PDF use static images. The HTML file is self-contained and can be shared or hosted as a portfolio page.
+
 ## Inspection activity and scope
 
-Inspection volume and purpose provide context for the rankings. The chart counts every recorded encounter, including visits with no recorded violations. “Follow-up” includes the exact purposes Reinspection and Partial ReInspection; mixed-purpose visits are grouped with other visits. These monthly counts describe activity, not a trend in restaurant safety.
+Inspection volume and purpose provide context for the rankings. The chart counts every recorded encounter, including visits with no recorded violations. “Follow-up” includes the exact purposes Reinspection and Partial ReInspection; mixed-purpose visits are grouped with other visits. These monthly counts describe activity in the combined dataset, not a trend in restaurant safety.
 
-<img src="2025_hall_of_shame_markdown_files/figure-commonmark/inspection-calendar-1.png" alt="Monthly stacked columns showing Initial, follow-up, and other inspection encounters from January through July 2025."  />
+<img src="2025_hall_of_shame_markdown_files/figure-commonmark/inspection-calendar-1.png" alt="Monthly stacked columns showing Initial/Comprehensive, follow-up, and other inspection encounters in 2025."  />
 
 ## Why category names alone cannot determine severity
 
@@ -102,21 +104,23 @@ Each row below shows the severity mix within one of the 15 most frequently cited
 
 ## The composition behind the ranking
 
-The bars below show the mean number of categories at each severity for the top 15 facilities in the Initial-only ranking. Facilities are ordered by their severity profile, not by total bar length. The annotations retain the inspection denominator and the number of unclassified categories so the limits of each comparison remain visible.
+The bars below show the mean number of categories at each severity for the top 15 facilities in the Initial/Comprehensive ranking. Facilities are ordered by their severity profile, not by total bar length. The annotations retain the inspection denominator and the number of unclassified categories so the limits of each comparison remain visible.
 
-<img src="2025_hall_of_shame_markdown_files/figure-commonmark/facility-severity-profiles-1.png" alt="Horizontal stacked bars showing mean high-, medium-, and low-severity category counts for the 15 highest-ranked facilities on Initial inspections."  />
+<img src="2025_hall_of_shame_markdown_files/figure-commonmark/facility-severity-profiles-1.png" alt="Horizontal stacked bars showing mean high-, medium-, and low-severity category counts for the 15 highest-ranked facilities on Initial/Comprehensive inspections."  />
 
 ## What happens at the next recorded follow-up?
 
-Match an Initial visit to the very next recorded encounter for the same facility only when that encounter is a Reinspection or Partial ReInspection on a later date. Keep the earliest eligible pair per facility within the available 2025 period, then exclude pairs with unclassified categories at either visit. This is chronological matching, not a verified administrative link between reports. Same-day pairs are excluded because the analysis does not use visit times.
+Match an Initial/Comprehensive visit to the very next recorded encounter for the same facility only when that encounter is a Reinspection or Partial ReInspection on a later date. Keep the earliest eligible pair per facility within the available 2025 period, then exclude pairs with unclassified categories at either visit. This is chronological matching, not a verified administrative link between reports. Same-day pairs are excluded because the analysis does not use visit times.
 
-Below the diagonal, the follow-up score is lower than the Initial score. Bubble area represents the number of facilities at the same coordinates. These facilities are a selected group that received follow-up visits; changes can reflect both corrections and narrower follow-up scope. Facilities without an eligible observed follow-up, including those near the July cutoff, do not appear.
+Below the diagonal, the follow-up score is lower than the Initial score. Bubble area represents the number of facilities at the same coordinates. These facilities are a selected group that received follow-up visits; changes can reflect both corrections and narrower follow-up scope.
+
+In the HTML version, **hover over a bubble to preview restaurant names; click it to see every facility at that coordinate**, including both visit dates, scores, and report links. The dropdown below the chart also lets you select a facility using a keyboard or touch screen. Accela search links are labeled as searches and include the encounter identifier.
 
 <img src="2025_hall_of_shame_markdown_files/figure-commonmark/followup-comparison-1.png" alt="Bubble scatterplot comparing Initial and next recorded follow-up scores, with a diagonal reference line for unchanged scores."  />
 
-# 2025 Rankings: Available January–July Period
+# 2025 Rankings
 
-Click a facility name for the linked historical report. **H/M/L** are category counts at the highest recorded severity; **U** is the number of unclassified categories. The tables describe recorded conditions during this period, not current operating conditions.
+Click a facility name for the linked report. **H/M/L** are category counts at the highest recorded severity; **U** is the number of unclassified categories. The tables describe recorded conditions during this period, not current operating conditions.
 
 ## Inspections ranked by recorded severity
 
@@ -174,11 +178,11 @@ Table: Top 20 encounters by known-severity score (5H + 3M + L)
 |[MiFan - 5923 Baum Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504170010)|2025-04-17 |Initial               |    44|  6|  4|  2|  1|
 |[The Fireside Inn - 4214 Steubenville Pike, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503190039)|2025-03-19 |Initial, Complaint    |    44|  5|  4|  7|  1|
 
-## Facilities ranked using Initial inspections
+## Facilities ranked using Initial/Comprehensive inspections
 
-Order facilities by mean H, then mean M, then mean L across Initial inspections only. **N** is the number of those inspections; **U** is their total unclassified category count. A high mean based on N = 1 does not establish a pattern of repeated problems. Links go to each facility's latest recorded encounter in the period, which may be a reinspection rather than an Initial visit.
+Order facilities by mean H, then mean M, then mean L across Initial/Comprehensive inspections only. **N** is the number of those inspections; **U** is their total unclassified category count. A high mean based on N = 1 does not establish a pattern of repeated problems. Links go to each facility's latest recorded encounter in the period, which may be a reinspection rather than an Initial visit.
 
-Table: Top 20 facilities by mean Initial-inspection severity profile
+Table: Top 20 facilities by mean Initial/Comprehensive-inspection severity profile
 
 |Facility                                                            | Rank|  N| Mean H| Mean M| Mean L|  U|
 |:-------------------------------------------------------------------|----:|--:|------:|------:|------:|--:|
@@ -307,17 +311,19 @@ Questions and suggestions on my methodology are welcome. Thanks for reading!
 
 # Reproducing the Analysis
 
+Interactive HTML additionally requires `plotly`, `htmlwidgets`, and `htmltools`: install them with `install.packages(c("plotly", "htmlwidgets", "htmltools"))`. With Quarto installed, run `quarto render 2025_hall_of_shame.qmd --to html`. The generated HTML embeds its JavaScript and works offline; opening the linked inspection reports requires internet access.
+
 Use R 4.1 or later with `dplyr` (1.1.0 or later), `tidyr`, `ggplot2`, `stringr`, `scales`, and `knitr`. Packages must be built for a compatible version of R. From the repository root:
 
-1. Save the [historical violation export](https://data.wprdc.org/datastore/dump/1a1329e2-418c-4bd3-af2c-cc334e7559af) as `data/violations.csv` and the matching [historical inspection export](https://data.wprdc.org/datastore/dump/4ea730d8-2bf9-4783-b0a5-b41ed687097e) as `data/inspections.csv`. Both resources are labeled 2014–2025 on WPRDC. The newer inspection feed uses a different schema.
+1. Save the [historical violation export](https://data.wprdc.org/datastore/dump/1a1329e2-418c-4bd3-af2c-cc334e7559af) as `data/wprdc_violations.csv` and the matching [historical inspection export](https://data.wprdc.org/datastore/dump/4ea730d8-2bf9-4783-b0a5-b41ed687097e) as `data/wprdc_inspections.csv`, then run `python3 scraper/scrape_pdfs.py --combine` to extract the Accela PDF reports (`data/accela_inspections.csv` and `data/accela_violations.csv`) and merge both sources into `data/inspections.csv` and `data/violations.csv`.
 2. Run `Rscript clean_inspections.r` to generate the summaries in `out/`.
 3. Run `Rscript tests/test_inspection_analysis.R` to check scoring and aggregation, including two comparisons with original inspection PDFs when the local exports are available. Run `Rscript tests/test_followup_matching.R` to check the follow-up chart's matching rules.
-4. Run `Rscript render_readme.r` to regenerate `README.md` and its plots from this document. For a PDF, install Quarto and a TeX distribution and run `quarto render 2025_hall_of_shame.qmd --to pdf`.
+4. Run `Rscript render_readme.r` to regenerate `README.md` (and `2026_README.md`) and plots from the Quarto documents. For a PDF, install Quarto and a TeX distribution and run `quarto render 2025_hall_of_shame.qmd --to pdf` or `quarto render 2026_hall_of_shame.qmd --to pdf`.
 
 Generated files:
 
 - `out/violations_by_inspection.csv`: all encounters in the shared export window, purpose, severity counts, unclassified counts, known-severity score, and `SCORE_COMPLETE` (whether every recorded violation category has a severity).
-- `out/violations_by_year.csv`: facility/year summaries, Initial-only and all-encounter means, denominators, and latest-report context within each year. The 2025 rows cover only the available period.
-- `out/category_severity_audit.csv`: recorded severity distribution by category and year across the shared historical window; the visualizations use only 2025.
+- `out/violations_by_year.csv`: facility/year summaries, Initial/Comprehensive-only and all-encounter means, denominators, and latest-report context within each year.
+- `out/category_severity_audit.csv`: recorded severity distribution by category and year across the shared window; the visualizations use only 2025.
 - `out/coverage.csv`: date bounds and record counts after training-client exclusions.
 - `out/excluded_training_facilities.csv`: excluded facility identifiers and names.

@@ -1,6 +1,6 @@
 # Run from the repository root: Rscript clean_inspections.r
-# Use the two matching historical (2014-2025) exports, not the new Accela feed.
-# https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations
+# Uses the combined dataset (data/inspections.csv and data/violations.csv)
+# merging the historical WPRDC exports and scraped Accela PDF reports.
 source("R/inspection_analysis.R")
 
 read_export <- function(path) {

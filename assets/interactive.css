@@ -1,0 +1,12 @@
+body { color: #172b45; background: #fafbfc; }
+h1, h2, h3 { color: #172b45; }
+.plotly.html-widget { max-width: 100%; }
+.followup-details {
+  padding: 1.25rem; margin: 1rem 0 2rem; background: white;
+  border: 1px solid #dce4ec; border-radius: 12px;
+}
+.followup-details label { font-weight: 600; display: block; margin-bottom: .5rem; }
+.followup-details select { width: 100%; padding: .65rem; border: 1px solid #929daa; border-radius: 5px; }
+.followup-results article { padding: 1rem 0; border-top: 1px solid #e5eaf0; overflow-wrap: anywhere; }
+.followup-results h4 { font-size: 1.1rem; margin: 0 0 .5rem; }
+.followup-results p { margin-bottom: .5rem; }

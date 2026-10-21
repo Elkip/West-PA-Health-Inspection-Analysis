@@ -5,6 +5,7 @@ source("R/visualizations.R")
 visits <- tibble(
   id = c(rep("A", 4), rep("B", 3), rep("C", 2), rep("D", 2)),
   encounter = as.character(seq_len(11)),
+  REPORT = paste0("https://example.org/report/", seq_len(11)),
   inspect_dt = as.Date("2025-01-01") + c(0, 1, 3, 4, 0, 1, 2, 0, 0, 0, 5),
   purpose = c("Initial", "Reinspection", "Initial", "Reinspection",
               "Initial", "Complaint", "Reinspection", "Initial", "Reinspection",
@@ -23,6 +24,9 @@ stopifnot(
   !any(pairs$id %in% c("B", "C")),
   filter(pairs, id == "D")$followup_score == 0,
   filter(pairs, id == "D")$days_to_followup == 5,
+  filter(pairs, id == "D")$REPORT == "https://example.org/report/10",
+  filter(pairs, id == "D")$followup_report == "https://example.org/report/11",
+  filter(pairs, id == "D")$followup_encounter == "11",
   filter(pairs, id == "D")$complete_pair
 )
 cat("Follow-up matching checks passed.\n")
