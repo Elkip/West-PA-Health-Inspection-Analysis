@@ -235,6 +235,94 @@ Table: All-encounter and latest-visit context for the facilities above
 |[Dragon City - 503 LINCOLN AVE, Pittsburgh](https://aca-prod.accela.com/ALLEGHENYCO/Cap/CapHome.aspx?module=EnvHealth&TabName=Home)|  2| 13.00|2026-06-04 |Comprehensive         |     19|  0|
 |[Lamperts Market - 2010 EDEN PARK BLVD, Mckeesport](https://aca-prod.accela.com/ALLEGHENYCO/Cap/CapHome.aspx?module=EnvHealth&TabName=Home)|  4|  8.50|2026-10-02 |Partial ReInspection  |      0|  0|
 
+
+# Discussion
+
+The category summaries cannot convey all the detail in an inspector's narrative. Here are selected excerpts from the 2026 Accela inspection reports, along with each encounter's severity-first rank, weighted-score rank, and placard status:
+
+**[Da Village Social Club and Event Center, Greenway Dr, 03/17/2026](data/accela_downloads/FSP-PERM-202603170185/_FoodSafety_Inspection_Report_567_20260317_163113.pdf)** *(Severity Rank #13, Weighted Score Rank #4 — Follow Up Required)*:
+
+- Facility has been serving food prepared in a private home. *REPEAT VIOLATION*
+
+- Evidence of vomit and fecal matter present in men's toilet room upstairs, including toilet and both handwashing sinks, not properly cleaned up.
+
+- Hand sink in men's restroom upstairs clogged with vomit residue.
+
+- Hookah/nicotine items found stored in box with food items.
+
+- Non essential items stored throughout in numerous rooms, including mattress and bed frame in the kitchen area.
+
+- Carbon monoxide hazard - water heater flume pitch is negative (pointing downwards).
+
+**[Kirkland's Bussin Kitchen, Broadway Ave, 09/10/2026](data/accela_downloads/FSP-PERM-202603030140/FoodSafety_Inspection_Report_567_DIT_20260910_231639.pdf)** *(Severity Rank #306, Weighted Score Rank #306 — Ordered To Close)*:
+
+- Facility found open and operating under a closure order issued by the Allegheny County Health Department.
+
+- Front door found propped open concealing the closure placard placed on the outer glass of the door.
+
+- Complaint in Equity served to Eric Kirkland of Kirklands Bussin LLC... Stowe Twp police present during the service.
+
+**[Paradise Island Hookah Lounge, Duquesne Plz, 03/05/2026](data/accela_downloads/FSP-PERM-202603050141/_FoodSafety_Inspection_Report_567_20260306_120945.pdf)** *(Severity Rank #47, Weighted Score Rank #19 — Ordered To Close)*:
+
+- A pan of spoiled raw chicken. Chicken has a strong odor, slimy, and is discolored.
+
+- Dog feces found on the floor under a swing in the swing bar room. Animals are not allowed in food facilities.
+
+**[Pulse Overlly Loaded, N Dallas Ave, 08/05/2026](data/accela_downloads/FSP-PERM-202608110472/_FoodSafety_Inspection_Report_567_DIT_20260811_115238.pdf)** *(Severity Rank #12, Weighted Score Rank #1 — Ordered To Close)*:
+
+- No hot water supplied to various critical sinks throughout the facility. *IMMINENT HAZARD*
+
+- Wastewater from handwashing sink in restroom near main bar observed collecting into large plastic bowl; not properly plumbed into wastewater line.
+
+- Several house flies observed throughout the facility (>5 flies; too many to count).
+
+- Evidence of roof leak observed in kitchen area (water damage causing ceiling collapse in minor spots).
+
+- Inspection conducted in conjunction with the Nuisance Bar Task Force.
+
+
+**[Cafe Vivella, Babcock Blvd, 08/11/2026](data/accela_downloads/FSP-PERM-202606160368/_FoodSafety_Inspection_Report_567_20260730_111259.pdf)** *(Severity Rank #8, Weighted Score Rank #13 — Reinspection Scheduled)*:
+
+- Sandals in handwashing sink. Removed during inspection.
+
+- Observed a child in food prep area at start of inspection.
+
+- Observed PIC place soiled dishes from the dining room onto food prep counter and cutting board.
+
+- Operator not knowledgeable on food safety with regards to personal hygiene, cold holding, sanitizing, cross contamination and food storage.
+
+**[Urban Air Adventure Park, E Waterfront Dr, 07/06/2026](data/accela_downloads/FSP-PERM-202603200190/_FoodSafety_Inspection_Report_567_DIT_20260706_124753.pdf)** *(Severity Rank #42, Weighted Score Rank #113 — Inspected & Permitted)*:
+
+- Numerous pieces of candy in the Candy Locker vending machine have been chewed open and through. Food and package debris can be seen throughout the machine. Operator has turned the machine off prior to inspection. Machine was still found in front customer area.
+
+- Rodent droppings can be seen throughout the facility, including... Around the Dip n Dots chest freezer [and] Inside of the vending machine.
+
+- Decomposing rodent found on a trap in the Loading Dock room.
+
+**[Red Robin Gourmet Burgers and Brews, E Waterfront Dr, 08/31/2026](data/accela_downloads/FSP-PERM-202608260503/FoodSafety_Inspection_Report_567_20260831_121704.pdf)** *(Severity Rank #98, Weighted Score Rank #113 — Inspected & Permitted)*:
+
+- Two dead mice were seen in glue boards under booths.
+
+- Three dead mice were seen in glue boards in cabinet with electrical panel box in server area.
+
+- Two mice, one live and one dead, were seen in glue boards under cold well for dressings in server area.
+
+**[Chaai & Chaatwala, Centre Ave, 08/18/2026](data/accela_downloads/FSP-PERM-202608180487/_FoodSafety_Inspection_Report_567_20260818_150031.pdf)** *(Severity Rank #14, Weighted Score Rank #7 — Ordered To Close)*:
+
+- When asked the PIC stated warewashing procedures were to sanitize, wash, and then rinse dishes.
+
+- Sewage pooling in unused basement.
+
+- 3 compartment sink clogged and unable to drain during inspection.
+
+**[Grand Mart, Arlington Ave, 07/29/2026](data/accela_downloads/FSP-PERM-202607290453/_FoodSafety_Inspection_Report_567_20260729_135315.pdf)** *(Severity Rank #156, Weighted Score Rank #68 — Inspected & Permitted)*:
+
+- Eggs are stored in a Monster energy drink merchandiser cooler.
+
+**[The Rocks Fried Factory, Broadway Ave, 05/15/2026](data/accela_downloads/FSP-PERM-202605150312/_FoodSafety_Inspection_Report_567_20260515_150459.pdf)** *(Severity Rank #139, Weighted Score Rank #86 — Inspected & Permitted)*:
+
+- One deceased mouse observed in an unused flowerpot in the basement.
+
 ---
 
 Health inspections are a snapshot of how a food facility is operating at a specific point in time, not a permanent verdict. Severity, inspection scope, and follow-up findings matter more than a single league-table position. Read the full report and check recent inspections before drawing conclusions about a facility today.

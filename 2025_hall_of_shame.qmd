@@ -335,15 +335,15 @@ initial_yearly |>
 
 # Discussion
 
-The category summaries cannot convey all the detail in an inspector's narrative. Here are selected excerpts from the historical reports, including corrections made during the visits:
+The category summaries cannot convey all the detail in an inspector's narrative. Here are selected excerpts from the historical reports, along with each encounter's severity-first rank, weighted-score rank, and placard status:
 
-**[Lucca Ristorante & Wine Bar, Craig St, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010017):**
+**[Lucca Ristorante & Wine Bar, Craig St, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010017)** *(Severity Rank #25, Weighted Score Rank #4 — Consumer Alert)*:
 
 - There are bottles of liquor stored beneath and contaminated by an unknown water source from
 the active ceiling leak behind the bar. The operator voluntarily moved the affected bottles to a safe
 storage location and discontinued service behind the bar.
 
-**[The Library, Carson St, 03/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180056):**
+**[The Library, Carson St, 03/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180056)** *(Severity Rank #11, Weighted Score Rank #11 — Inspected & Permitted)*:
 
 -  Numerous rodent droppings [in 6 areas]... Nesting material was identified [in 4 areas]... Loose bait found in kitchen and basement.
 
@@ -355,7 +355,7 @@ and surrounding areas.
 - It was discovered that the dish machine is not functioning properly and is failing to sanitize
 effectively. The chlorine readout measured at 0.00 PPM. Owner initiated a phone call for repairs.
 
-**[Zen Asian Diner, Butler St, 07/14/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140064)**
+**[Zen Asian Diner, Butler St, 07/14/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140064)** *(Severity Rank #27, Weighted Score Rank #8 — Inspected & Permitted)*:
 
 - In basement, there is a decayed corpse of an animal, about the size of a possum or large rat.
 Unable to determine the type of animal during inspection.
@@ -367,7 +367,7 @@ food preparation room and that door does not seal.
 
 *REPEAT VIOLATIONS*
 
-**[Fun Asian Bistro, Frankstown Rd, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010031)**
+**[Fun Asian Bistro, Frankstown Rd, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010031)** *(Severity Rank #10, Weighted Score Rank #8 — Inspected & Permitted)*:
 
 - Did not observe any employee handwashing during inspection.
 
@@ -382,7 +382,7 @@ Discarded during inspection. *REPEAT VIOLATION*
 
 \pagebreak
 
-**[Hastina Royal Indian Cuisine, Park Manor Boulevard, 06/11/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506110018)**
+**[Hastina Royal Indian Cuisine, Park Manor Boulevard, 06/11/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506110018)** *(Severity Rank #69, Weighted Score Rank #14 — Consumer Alert)*:
 
 - Facility is open and operating without a valid health permit.
 
@@ -391,10 +391,78 @@ Discarded during inspection. *REPEAT VIOLATION*
 - Consumer alert administered during inspection due to several high and medium risk violations.
 
 
-**[The Mintt, Banksville Rd, 04/21/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210035)**
+**[The Mintt, Banksville Rd, 04/21/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210035)** *(Severity Rank #6, Weighted Score Rank #4 — Consumer Alert)*:
 
 - In the walk-in cooler, a container of raw lamb was observed stored behind a loosely covered bowl
 of dough. Blood was observed to have dripped onto the plastic wrap covering a bowl of pudding.
+
+**[Kirkland's Bussin Kitchen, Broadway Ave, 05/15/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202505150031)** *(Severity Rank #719, Weighted Score Rank #439 — Ordered To Close)*:
+
+- Facility lacks hot water. Operator reports that water service was interrupted when the account was switched over.
+
+- The handwashing sink in the kitchen was clogged with food at the beginning of the inspection.
+
+- Home-style cooking appliances are in use including a rice cooker, tabletop fryer, and Blackstone flat top grills.
+
+- Facility was smoky upon arrival due to the ventilation hood not being turned on during cooking and cooking equipment not being under the hood.
+
+- Facility is ordered closed. Do not conceal, remove, or cover the closure placard.
+
+**[Nepali Asian Restaurant, Brownsville Rd, 01/09/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501090031)** *(Severity Rank #2, Weighted Score Rank #1 — Ordered To Close)*:
+
+- More than 5 dead fruit flies found in open bag of all-purpose flour. Discarded.
+
+- Dried German cockroach found in sixth size hotel pan of salt above 2 door prep cooler.
+
+- Live juvenile German cockroach found in container of white rice on dry storage shelving in kitchen.
+
+- Greater than 5 adult live cockroaches observed on dry pasta in opened packaging. Discarded.
+
+- Three cans of aerosol roach spray and one gallon sized pump sprayer of insecticide observed in kitchen.
+
+**[MiFan, Baum Blvd, 04/17/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504170010)** *(Severity Rank #3, Weighted Score Rank #18 — Inspected & Permitted)*:
+
+- Facility is reusing raw chicken boxes to store cooked egg rolls and bags of spices. Discarded. *REPEAT VIOLATION*
+
+- In the walk-in freezer, there are approximately 20 black trash bags filled with cooked chicken wings.
+
+- A bucket of soapy water was stored on top of the bulk flour ingredient bin in the kitchen.
+
+- Sanitizer buckets in the kitchen all contained 0ppm of chlorine sanitizer.
+
+**[Everyday Noodles, Forbes Ave, 06/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506180024)** *(Severity Rank #16, Weighted Score Rank #30 — Consumer Alert)*:
+
+- One bag of onions on a sheet tray on the bottom shelf of the speed rack in the basement observed resting on top of fresh rodent droppings, and fresh rodent droppings observed inside bag. Bag of onions discarded.
+
+- One soy sauce bucket with no lid in the dry storage area re-used to store Panko observed with a rodent dropping on the surface of the panko. Panko discarded.
+
+- One sheet tray, contaminated by rodent droppings, not sanitized before being returned to storage.
+
+- One live mouse observed on a glue trap behind the water heater... One dead and decomposed mouse observed on floor beneath dry storage shelves.
+
+\pagebreak
+
+**[Diners 2+1, Murray Ave, 03/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180044)** *(Severity Rank #24, Weighted Score Rank #3 — Inspected & Permitted)*:
+
+- Two bulk bags of sugar in the side dry storage room observed with packages gnawed at the bottom, sugar spilling out, and rodent droppings adjacent. Both bags discarded during inspection.
+
+- One case of unidentifiable produce (possibly peppers) severely covered in a white, fuzzy, mold-like substance in the Coke merch cooler. Discarded during inspection.
+
+- ~10 fresh rodent droppings observed in both deep fryer cabinets.
+
+**[Dive Bar & Grille, Carson St, 06/13/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506130009)** *(Severity Rank #8, Weighted Score Rank #8 — Inspected & Permitted)*:
+
+- Freshly dead mouse found in customer seating area upstairs... Three dead mice found on a glue board underneath the two-bowl sink... Two dead mice found in basement.
+
+- At upstairs bar, fresh rodent droppings observed in old prep cooler that is now a storage area.
+
+- Soda gun on right side of first floor bar and two soda gun holsters have brown, slime-like substance in them.
+
+**[Sambok Korean Grocery, Penn Ave, 01/03/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501030016)** *(Severity Rank #9, Weighted Score Rank #11 — Inspected & Permitted)*:
+
+- Observed staff washing hands in three (3) compartment sink with washed napa cabbage present in the sink.
+
+- Four burner range has a red tag by the gas company. Do not use this equipment.
 
 ---
 
