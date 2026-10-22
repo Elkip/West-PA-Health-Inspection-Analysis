@@ -20,13 +20,13 @@ format:
       - \fancyhf{}
       - \fancyhead[R]{\thepage}
       - \renewcommand{\headrulewidth}{0pt}
-    output-file: 2026_West_PA_Health_Violations
+    output-file: 2026.pdf
   html:
     toc: true
     theme: cosmo
     css: assets/interactive.css
     embed-resources: true
-    output-file: 2026_Health_Inspections_Interactive.html
+    output-file: 2026.html
 
 ---
 
@@ -34,7 +34,7 @@ format:
 ```{r}
 #| include: false
 
-# SETUP: first run Rscript clean_inspections.r
+# SETUP: first run Rscript scripts/build_summaries.R from the repository root
 source("R/inspection_analysis.R")
 source("R/visualizations.R")
 source("R/interactive_visualizations.R")
@@ -42,7 +42,7 @@ library(ggplot2)
 library(knitr)
 options(knitr.kable.NA = "—")
 if (!knitr::is_latex_output() && !interactive_output()) {
-  knitr::opts_chunk$set(fig.path = "2026_hall_of_shame_markdown_files/figure-commonmark/")
+  knitr::opts_chunk$set(fig.path = "2026_markdown_files/figure-commonmark/")
 }
 
 escape_latex_str <- function(x) {
@@ -145,6 +145,8 @@ These are examples, not a fixed severity lookup for all findings in a category. 
 
 ## Comparison population and data quality
 
+**Permanent-establishment scope:** explicit permanent permit records are included; legacy records use a documented fixed-site category allowlist. Mobile and temporary categories are excluded, and ambiguous shared-kitchen/commissary categories are held out unless an explicit permanent permit is available. Schools, hospitals, and fixed-site pool snack bars can qualify. Historical permit types cannot be verified from category codes alone. See [the scope and coverage audit](../docs/data-coverage.md) and `out/inspection_scope_audit.csv` for decisions and evidence.
+
 - Link the inspection and violation exports by **`encounter`**, and group facilities by **`id`**. Names and street addresses are display labels, not identifiers. Separate encounters on the same date remain separate inspections.
 - Include encounters from the inspection export even when there are no matching `V` rows. There are `r fmt(sum(inspections$NUM_VIOLATION_CATEGORIES == 0))` such encounters in this period. “Zero recorded violations” is a database result, not proof that every condition was assessed or satisfactory.
 - Compare facilities primarily using the mean H/M/L profile of routine visits whose purpose is **“Comprehensive”** (or **“Initial”**). Reinspections, complaints, pre-operational visits, and change-of-ownership encounters can have different scopes. All-encounter averages remain descriptive context. Even routine visits are not a random or fully standardized sample, and facilities with one visit have limited evidence.
@@ -230,9 +232,11 @@ The severity-first and 5/3/1 weighted top-20 inspection lists share **`r length(
 
 # A Visual Tour of the Findings
 
-The HTML report adds hover details, zoom controls, and clickable follow-up bubbles. Render it with `quarto render 2026_hall_of_shame.qmd --to html` and open `2026_Health_Inspections_Interactive.html` in a browser. GitHub's README preview and the PDF use static images. The HTML file is self-contained and can be shared or hosted as a portfolio page.
+The HTML report adds hover details, zoom controls, and clickable follow-up bubbles. From the repository root, run `quarto render reports/2026.qmd --to html` and open `out/site/reports/2026.html` in a browser. Generated Markdown and PDF reports use static images. The HTML file is self-contained and can be shared or hosted as a portfolio page.
 
 ## Inspection activity and scope
+
+**This is an incomplete PDF sample.** WPRDC's restored inspection feed shows substantially more Food Facility inspections than the locally downloaded PDFs over their shared date range. The chart below describes the available, filtered sample—not all county inspections. Inventory-only records are not scored as clean visits. [Audit findings and reproduction instructions](../docs/data-coverage.md).
 
 Inspection volume and purpose provide context for the rankings. The chart counts every recorded encounter, including visits with no recorded violations. “Follow-up” includes the exact purposes Reinspection and Partial ReInspection; mixed-purpose and pre-operational/ownership-change visits are grouped with other visits. These monthly counts describe activity in the scraped PDF dataset, not a trend in restaurant safety.
 
@@ -336,7 +340,7 @@ initial_yearly |>
 
 The category summaries cannot convey all the detail in an inspector's narrative. Here are selected excerpts from the 2026 Accela inspection reports, along with each encounter's severity-first rank, weighted-score rank, and placard status:
 
-**[Da Village Social Club and Event Center, Greenway Dr, 03/17/2026](data/accela_downloads/FSP-PERM-202603170185/_FoodSafety_Inspection_Report_567_20260317_163113.pdf)** *(Severity Rank #13, Weighted Score Rank #4 — Follow Up Required)*:
+**[Da Village Social Club and Event Center, Greenway Dr, 03/17/2026](data/accela_downloads/FSP-PERM-202603170185/_FoodSafety_Inspection_Report_567_20260317_163113.pdf)** *(Severity Rank #35, Weighted Score Rank #10 — Follow Up Required)*:
 
 - Facility has been serving food prepared in a private home. *REPEAT VIOLATION*
 
@@ -350,7 +354,7 @@ The category summaries cannot convey all the detail in an inspector's narrative.
 
 - Carbon monoxide hazard - water heater flume pitch is negative (pointing downwards).
 
-**[Kirkland's Bussin Kitchen, Broadway Ave, 09/10/2026](data/accela_downloads/FSP-PERM-202603030140/FoodSafety_Inspection_Report_567_DIT_20260910_231639.pdf)** *(Severity Rank #306, Weighted Score Rank #306 — Ordered To Close)*:
+**[Kirkland's Bussin Kitchen, Broadway Ave, 09/10/2026](data/accela_downloads/FSP-PERM-202603030140/FoodSafety_Inspection_Report_567_DIT_20260910_231639.pdf)** *(Severity Rank #688, Weighted Score Rank #688 — Ordered To Close)*:
 
 - Facility found open and operating under a closure order issued by the Allegheny County Health Department.
 
@@ -358,13 +362,13 @@ The category summaries cannot convey all the detail in an inspector's narrative.
 
 - Complaint in Equity served to Eric Kirkland of Kirklands Bussin LLC... Stowe Twp police present during the service.
 
-**[Paradise Island Hookah Lounge, Duquesne Plz, 03/05/2026](data/accela_downloads/FSP-PERM-202603050141/_FoodSafety_Inspection_Report_567_20260306_120945.pdf)** *(Severity Rank #47, Weighted Score Rank #19 — Ordered To Close)*:
+**[Paradise Island Hookah Lounge, Duquesne Plz, 03/05/2026](data/accela_downloads/FSP-PERM-202603050141/_FoodSafety_Inspection_Report_567_20260306_120945.pdf)** *(Severity Rank #124, Weighted Score Rank #51 — Ordered To Close)*:
 
 - A pan of spoiled raw chicken. Chicken has a strong odor, slimy, and is discolored.
 
 - Dog feces found on the floor under a swing in the swing bar room. Animals are not allowed in food facilities.
 
-**[Pulse Overlly Loaded, N Dallas Ave, 08/05/2026](data/accela_downloads/FSP-PERM-202608110472/_FoodSafety_Inspection_Report_567_DIT_20260811_115238.pdf)** *(Severity Rank #12, Weighted Score Rank #1 — Ordered To Close)*:
+**[Pulse Overlly Loaded, N Dallas Ave, 08/05/2026](data/accela_downloads/FSP-PERM-202608110472/_FoodSafety_Inspection_Report_567_DIT_20260811_115238.pdf)** *(Severity Rank #34, Weighted Score Rank #6 — Ordered To Close)*:
 
 - No hot water supplied to various critical sinks throughout the facility. *IMMINENT HAZARD*
 
@@ -378,7 +382,7 @@ The category summaries cannot convey all the detail in an inspector's narrative.
 
 \pagebreak
 
-**[Cafe Vivella, Babcock Blvd, 08/11/2026](data/accela_downloads/FSP-PERM-202606160368/_FoodSafety_Inspection_Report_567_20260730_111259.pdf)** *(Severity Rank #8, Weighted Score Rank #13 — Reinspection Scheduled)*:
+**[Cafe Vivella, Babcock Blvd, 08/11/2026](data/accela_downloads/FSP-PERM-202606160368/_FoodSafety_Inspection_Report_567_20260730_111259.pdf)** *(Severity Rank #25, Weighted Score Rank #38 — Reinspection Scheduled)*:
 
 - Sandals in handwashing sink. Removed during inspection.
 
@@ -388,7 +392,7 @@ The category summaries cannot convey all the detail in an inspector's narrative.
 
 - Operator not knowledgeable on food safety with regards to personal hygiene, cold holding, sanitizing, cross contamination and food storage.
 
-**[Urban Air Adventure Park, E Waterfront Dr, 07/06/2026](data/accela_downloads/FSP-PERM-202603200190/_FoodSafety_Inspection_Report_567_DIT_20260706_124753.pdf)** *(Severity Rank #42, Weighted Score Rank #113 — Inspected & Permitted)*:
+**[Urban Air Adventure Park, E Waterfront Dr, 07/06/2026](data/accela_downloads/FSP-PERM-202603200190/_FoodSafety_Inspection_Report_567_DIT_20260706_124753.pdf)** *(Severity Rank #106, Weighted Score Rank #262 — Inspected & Permitted)*:
 
 - Numerous pieces of candy in the Candy Locker vending machine have been chewed open and through. Food and package debris can be seen throughout the machine. Operator has turned the machine off prior to inspection. Machine was still found in front customer area.
 
@@ -396,7 +400,7 @@ The category summaries cannot convey all the detail in an inspector's narrative.
 
 - Decomposing rodent found on a trap in the Loading Dock room.
 
-**[Red Robin Gourmet Burgers and Brews, E Waterfront Dr, 08/31/2026](data/accela_downloads/FSP-PERM-202608260503/FoodSafety_Inspection_Report_567_20260831_121704.pdf)** *(Severity Rank #98, Weighted Score Rank #113 — Inspected & Permitted)*:
+**[Red Robin Gourmet Burgers and Brews, E Waterfront Dr, 08/31/2026](data/accela_downloads/FSP-PERM-202608260503/FoodSafety_Inspection_Report_567_20260831_121704.pdf)** *(Severity Rank #239, Weighted Score Rank #262 — Inspected & Permitted)*:
 
 - Two dead mice were seen in glue boards under booths.
 
@@ -404,7 +408,7 @@ The category summaries cannot convey all the detail in an inspector's narrative.
 
 - Two mice, one live and one dead, were seen in glue boards under cold well for dressings in server area.
 
-**[Chaai & Chaatwala, Centre Ave, 08/18/2026](data/accela_downloads/FSP-PERM-202608180487/_FoodSafety_Inspection_Report_567_20260818_150031.pdf)** *(Severity Rank #14, Weighted Score Rank #7 — Ordered To Close)*:
+**[Chaai & Chaatwala, Centre Ave, 08/18/2026](data/accela_downloads/FSP-PERM-202608180487/_FoodSafety_Inspection_Report_567_20260818_150031.pdf)** *(Severity Rank #39, Weighted Score Rank #19 — Ordered To Close)*:
 
 - When asked the PIC stated warewashing procedures were to sanitize, wash, and then rinse dishes.
 
@@ -412,13 +416,115 @@ The category summaries cannot convey all the detail in an inspector's narrative.
 
 - 3 compartment sink clogged and unable to drain during inspection.
 
-**[Grand Mart, Arlington Ave, 07/29/2026](data/accela_downloads/FSP-PERM-202607290453/_FoodSafety_Inspection_Report_567_20260729_135315.pdf)** *(Severity Rank #156, Weighted Score Rank #68 — Inspected & Permitted)*:
+**[Grand Mart, Arlington Ave, 07/29/2026](data/accela_downloads/FSP-PERM-202607290453/_FoodSafety_Inspection_Report_567_20260729_135315.pdf)** *(Severity Rank #380, Weighted Score Rank #161 — Inspected & Permitted)*:
 
 - Eggs are stored in a Monster energy drink merchandiser cooler.
 
-**[The Rocks Fried Factory, Broadway Ave, 05/15/2026](data/accela_downloads/FSP-PERM-202605150312/_FoodSafety_Inspection_Report_567_20260515_150459.pdf)** *(Severity Rank #139, Weighted Score Rank #86 — Inspected & Permitted)*:
+**[The Rocks Fried Factory, Broadway Ave, 05/15/2026](data/accela_downloads/FSP-PERM-202605150312/_FoodSafety_Inspection_Report_567_20260515_150459.pdf)** *(Severity Rank #335, Weighted Score Rank #205 — Inspected & Permitted)*:
 
 - One deceased mouse observed in an unused flowerpot in the basement.
+
+\pagebreak
+
+**[Lavi's Market, Forbes Ave, 06/24/2026](data/accela_downloads/FSP-PERM-202510240235/_FoodSafety_Inspection_Report_567_DIT_20260624_170307.pdf)** *(Severity Rank #1, Weighted Score Rank #1 — Inspected & Permitted)*:
+
+- One chicken salad sandwich in Turbo Air cooler had a mold-like substance on it. Discarded.
+
+- Boxes of single-use items (cups, containers) stored on the floor in the left-side toilet room. An ice scoop was also found in a box in the left-side toilet room.
+
+- It appears that thermometer is not being used to monitor food temperatures, as evident by this report.
+
+**[China Taste, 5th Ave, 05/19/2026](data/accela_downloads/202412180003/_FoodSafety_Inspection_Report_567_20260519_143444.pdf)** *(Severity Rank #4, Weighted Score Rank #23 — Inspected & Permitted)*:
+
+- Medication bottles stored with food items above the mop sink.
+
+- Electric shaver stored with canned goods on shelf.
+
+- Walk in cooler is dimly lit. Flashlight was needed to properly inspect walk in cooler.
+
+**[Jalsa Indian Restaurant & Banquet Hall, Mary St, 07/21/2026](data/accela_downloads/FSP-PERM-202509230136/_FoodSafety_Inspection_Report_567_20260722_103341.pdf)** *(Severity Rank #10, Weighted Score Rank #2 — Inspected & Permitted)*:
+
+- In the first floor banquet area women's restroom, the toilet in the far side stall is full of stale urine and toilet paper. Odor is present throughout the restroom. *REPEAT VIOLATION*
+
+- There is a large amount of toilet paper and urine sitting in the men's restroom toilet for the restaurant side.
+
+- One freshly dead mouse located in the furnace room where the grease trap is located. Too many to count large rodent droppings found on the right side of the sump pump storage room.
+
+**[Big Shot Bob's, Frankstown Rd, 06/12/2026](data/accela_downloads/FSP-PERM-202512080421/_FoodSafety_Inspection_Report_567_20260612_151333.pdf)** *(Severity Rank #15, Weighted Score Rank #17 — Inspected & Permitted)*:
+
+- *IMMINENT HAZARD* During inspection, toilet was clogged. Drains for the kitchen handsink, food prep sink, and restroom handsink were opened and water was allowed to flow through. The floor drain in the restroom then began overflowing - sewage was backing up onto the floor.
+
+- The handsink and food prep sink appear to possibly be plumbed together. When hot water at prep sink is turned on, it causes hot water to flow through the hand sink and vice versa.
+
+- Unsealed wood present on floor under three-bowl sink. It appears that the wood is holding a pipe up.
+
+**[EGE Mediterranean, N Craig St, 05/14/2026](data/accela_downloads/202502190007/_FoodSafety_Inspection_Report_567_20260515_093910.pdf)** *(Severity Rank #15, Weighted Score Rank #17 — Follow Up Required)*:
+
+- There are pool noodles used as improvised edge protectors at the serving line.
+
+- The facility is storing cardboard boxes on top of the pizza oven and next to the fryers.
+
+**[Jason Lyttle, Park Ave, 08/10/2026](data/accela_downloads/FSP-PERM-202608110473/_FoodSafety_Inspection_Report_567_DIT_20260811_093419.pdf)** *(Severity Rank #17, Weighted Score Rank #30 — Ordered To Close)*:
+
+- Food products offered for sale from an unknown source: Food products containing sea moss observed in the cooler; Unmarked packages of raw meat observed in the freezer; Unmarked packages of cheese observed in the cooler.
+
+- Raw meat products are being offered unpackaged in the upright cooler and freezer for customer self-service.
+
+\pagebreak
+
+**[Haveli, Mall Blvd, 06/24/2026](data/accela_downloads/FSP-PERM-202511130297/_FoodSafety_Inspection_Report_567_20260624_152550.pdf)** *(Severity Rank #31, Weighted Score Rank #93 — Inspected & Permitted)*:
+
+- Food handlers on cook line were chopping cabbage and handling cooked naan with bare hand contact.
+
+- Yogurt is stored in a bucket labeled dish detergent.
+
+**[Apple Harvest Deli & Catering, 3rd St, 07/22/2026](data/accela_downloads/FSP-PERM-202511040270/_FoodSafety_Inspection_Report_567_20260722_113921.pdf)** *(Severity Rank #40, Weighted Score Rank #38 — Inspected & Permitted)*:
+
+- Employee observed utilizing/inhaling e-cigarette while preparing dough. Handwashing did not occur.
+
+- Two types of e-cigarettes stored on their sides on a wire rack above a food preparation area. There were also nicotine products ("vape pods") stored (sealed) on this shelf as well.
+
+- Swarms of fruit flies present in and in the area of the hole in the floor across from cookline. Swarms of fruit flies present in and around a box of potatoes near the cookline. *REPEAT VIOLATIONS*
+
+**[CK Mart Sharpsburg, N Main St, 04/27/2026](data/accela_downloads/FSP-PERM-202604270267/_FoodSafety_Inspection_Report_567_20260427_135058.pdf)** *(Severity Rank #65, Weighted Score Rank #78 — Consumer Alert)*:
+
+- Adulterated boxes of ramen noodles by rodents... Rodent droppings on 3 cans of Spaghetti O's.
+
+- Rodent droppings too many to count observed inside cabinet of slush machine, soda beverage cabinet around compressor, under bottom shelf on food shelves.
+
+- 2 Dead rodents under slush machine and on interior border of cabinet panel.
+
+**[The Runaway Lounge, Lebanon Rd, 02/12/2026](data/accela_downloads/FSP-PERM-202602120086/_FoodSafety_Inspection_Report_567_20260212_141718.pdf)** *(Severity Rank #75, Weighted Score Rank #66 — No Entry - Closure)*:
+
+- Ice for service in ice bin in contact with waste water from soda gun drain. Waste line from soda gun draining into service ice bin at bar.
+
+- The cabinet under the three compartment sink in the kitchen is rotted through.
+
+**[Seven Days Grocery, Brownsville Rd, 09/30/2026](data/accela_downloads/202503110008/FoodSafety_Inspection_Report_567_DIT_20260930_124736.pdf)** *(Severity Rank #109, Weighted Score Rank #305 — Inspected & Permitted)*:
+
+- One live German cockroach observed in meat cutting department. Two dead cockroaches observed in meat cutting department.
+
+- Food wrappers, bottles, and dried betel nut expectorant observed around and behind skill games next to meat cutting department.
+
+**[Four Seasons Pizza, Hamil Rd, 06/01/2026](data/accela_downloads/FSP-PERM-202602180106/_FoodSafety_Inspection_Report_567_20260601_121850.pdf)** *(Severity Rank #223, Weighted Score Rank #364 — Inspected & Permitted)*:
+
+- Employee beverage without a lid found on the three-door prep table. There is a bowl of food next to it with a bite taken out, showing evidence of food handlers eating while preparing food. *REPEAT VIOLATION*
+
+**[New Miss Dees Market, Bell Ave, 08/10/2026](data/accela_downloads/FSP-PERM-202608100471/_FoodSafety_Inspection_Report_567_20260811_084926.pdf)** *(Severity Rank #234, Weighted Score Rank #234 — Inspected & Permitted)*:
+
+- Evidence of employee sleeping in back storage area: cot with blankets, slippers, prescription medication, and personal hygiene items. Owner stated that employee takes occasional naps during shifts.
+
+**[Cafe Samarkand, Banksville Rd, 10/07/2026](data/accela_downloads/202412230001/FoodSafety_Inspection_Report_567_20261009_160411.pdf)** *(Severity Rank #283, Weighted Score Rank #466 — Consumer Alert)*:
+
+- Employee observed mopping the floor and then handling food without washing hands.
+
+- The only toilet in the facility is inoperable... The staff has been given permission by the manager at Kuhn's Market to use their restrooms until the toilet here is functional. This permission does not extend to customers. Therefore, Cafe Samarkand is to be take-out only until the toilet is functional and the consumer alert has been removed.
+
+- In addition, this facility was permitted for 12 seats but now has 48, with only one restroom.
+
+**[Pizza Bari, Liberty Ave, 09/25/2026](data/accela_downloads/FSP-PERM-202602090077/FoodSafety_Inspection_Report_567_DIT_20261020_154241.pdf)** *(Severity Rank #283, Weighted Score Rank #466 — Inspected & Permitted)*:
+
+- Too many to count German roaches in three bowl sink area and behind posters. Extension cords hanging in air and fire sprinkler pipes are covered in roach scat.
 
 ---
 
@@ -430,14 +536,14 @@ Questions and suggestions on my methodology are welcome. Thanks for reading!
 
 # Reproducing the Analysis
 
-Interactive HTML additionally requires `plotly`, `htmlwidgets`, and `htmltools`: install them with `install.packages(c("plotly", "htmlwidgets", "htmltools"))`. With Quarto installed, run `quarto render 2026_hall_of_shame.qmd --to html`. The generated HTML embeds its JavaScript and works offline; opening the linked inspection reports requires internet access.
+Interactive HTML additionally requires `plotly`, `htmlwidgets`, and `htmltools`: install them with `install.packages(c("plotly", "htmlwidgets", "htmltools"))`. With Quarto installed, run `quarto render reports/2026.qmd --to html` from the repository root. The generated HTML embeds its JavaScript and works offline; opening the linked inspection reports requires internet access.
 
 Use R 4.1 or later with `dplyr` (1.1.0 or later), `tidyr`, `ggplot2`, `stringr`, `scales`, and `knitr`. Packages must be built for a compatible version of R. From the repository root:
 
 1. Save the [historical violation export](https://data.wprdc.org/datastore/dump/1a1329e2-418c-4bd3-af2c-cc334e7559af) as `data/wprdc_violations.csv` and the matching [historical inspection export](https://data.wprdc.org/datastore/dump/4ea730d8-2bf9-4783-b0a5-b41ed687097e) as `data/wprdc_inspections.csv`, then run `python3 scraper/scrape_pdfs.py --combine` to extract the Accela PDF reports (`data/accela_inspections.csv` and `data/accela_violations.csv`) and merge both sources into `data/inspections.csv` and `data/violations.csv`.
-2. Run `Rscript clean_inspections.r` to generate the summaries in `out/`.
+2. Run `Rscript scripts/build_summaries.R` to generate the summaries in `out/`.
 3. Run `Rscript tests/test_inspection_analysis.R` to check scoring and aggregation, including two comparisons with original inspection PDFs when the local exports are available. Run `Rscript tests/test_followup_matching.R` to check the follow-up chart's matching rules.
-4. Run `Rscript render_readme.r` to regenerate `README.md` (and `2026_README.md`) and plots from the Quarto documents. For a PDF, install Quarto and a TeX distribution and run `quarto render 2026_hall_of_shame.qmd --to pdf`.
+4. Run `Rscript scripts/render_reports.R` to generate annual Markdown reports and their assets in `out/reports/`. For PDFs, install Quarto and a TeX distribution and run `quarto render --to pdf`; the outputs are written to `out/site/reports/`.
 
 Generated files:
 

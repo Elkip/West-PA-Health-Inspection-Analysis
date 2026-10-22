@@ -1,7 +1,7 @@
 """Browser smoke check for rendered HTML (requires Python Playwright + Chromium).
 
 Run: .venv/bin/python tests/check_interactive_report.py
-Render both HTML reports first. Charts must work offline, including file:// URLs.
+Run `quarto render --to html` first. Charts must work offline, including file:// URLs.
 """
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -14,7 +14,7 @@ with sync_playwright() as playwright:
         page = context.new_page()
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        page.goto((root / f"{year}_Health_Inspections_Interactive.html").as_uri())
+        page.goto((root / "out" / "site" / "reports" / f"{year}.html").as_uri())
         page.wait_for_selector(".followup-details select")
         assert page.locator(".js-plotly-plot").count() == 6
         details = page.locator(".followup-details")

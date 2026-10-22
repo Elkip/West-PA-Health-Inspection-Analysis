@@ -52,6 +52,8 @@ INSPECTIONS_COLUMNS = [
     "reispt_cd",
     "reispt_dt",
     "status",
+    "source",
+    "permit_record_id",
 ]
 
 VIOLATIONS_COLUMNS = [
@@ -249,7 +251,7 @@ def parse_header_fields(
             best_label = min(candidates)[1]
             assigned[best_label].append(vtext)
 
-    result = {k: " ".join(v).strip() for k, v in assigned.items()}
+    result = {k: re.sub(r"\s*([’‘])\s*", r"\1", " ".join(v)).strip() for k, v in assigned.items()}
 
     # Clean up wrapped "Pre-Operational Inspection" or "Complaint Investigation" spillover into Permit Exp. Date
     purpose = result.get("Purpose", "")
@@ -487,6 +489,8 @@ def parse_pdf(pdf_path: Path, root_dir: Path) -> Optional[Tuple[Dict[str, str], 
         "reispt_cd": reispt_cd,
         "reispt_dt": reispt_dt,
         "status": "",
+        "source": "Accela PDF",
+        "permit_record_id": pdf_path.parent.name,
     }
 
     violation_rows: List[Dict[str, str]] = []
@@ -532,7 +536,7 @@ def parse_pdf(pdf_path: Path, root_dir: Path) -> Optional[Tuple[Dict[str, str], 
     return inspection_row, violation_rows, frozen_marks
 
 
-def scrape_directory(input_dir: Path) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], int, int]:
+def scrape_directory(input_dir: Path, audit_rows=None) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], int, int]:
     """
     Walk input_dir, parse all inspection PDFs, deduplicate identical re-uploads,
     and disambiguate any Encounter ID collisions across distinct facilities.
@@ -550,11 +554,14 @@ def scrape_directory(input_dir: Path) -> Tuple[List[Dict[str, str]], List[Dict[s
     used_encounters: Dict[str, str] = {}  # encounter -> client_id
     skipped_non_reports = 0
     skipped_duplicates = 0
+    if audit_rows is None:
+        audit_rows = []
 
     for pdf_path in pdf_paths:
         parsed = parse_pdf(pdf_path, input_dir)
         if parsed is None:
             skipped_non_reports += 1
+            audit_rows.append({"path": str(pdf_path), "status": "unparsed", "encounter": "", "id": "", "inspect_dt": ""})
             continue
 
         insp_row, viol_rows, frozen_marks = parsed
@@ -565,6 +572,7 @@ def scrape_directory(input_dir: Path) -> Tuple[List[Dict[str, str]], List[Dict[s
         key = (enc, cid)
         if key in seen_Keys and seen_Keys[key] == frozen_marks:
             skipped_duplicates += 1
+            audit_rows.append({"path": str(pdf_path), "status": "duplicate", "encounter": enc, "id": cid, "inspect_dt": insp_row["inspect_dt"]})
             continue
         seen_Keys[key] = frozen_marks
 
@@ -581,6 +589,7 @@ def scrape_directory(input_dir: Path) -> Tuple[List[Dict[str, str]], List[Dict[s
         used_encounters[enc] = cid
         inspections.append(insp_row)
         violations.extend(viol_rows)
+        audit_rows.append({"path": str(pdf_path), "status": "parsed", "encounter": enc, "id": cid, "inspect_dt": insp_row["inspect_dt"]})
 
     # Sort chronologically by inspect_dt, encounter
     inspections.sort(key=lambda r: (r["inspect_dt"], r["encounter"]))
@@ -614,6 +623,8 @@ def combine_with_wprdc(
     """Combine WPRDC historical CSVs with newly scraped Accela records, deduplicating by encounter."""
     with open(wprdc_insp_path, newline="", encoding="utf-8") as f:
         w_insp = list(csv.DictReader(f))
+    for row in w_insp:
+        row["source"] = "WPRDC historical"
     with open(wprdc_viol_path, newline="", encoding="utf-8") as f:
         w_viol = list(csv.DictReader(f))
 
@@ -667,12 +678,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    inspections, violations, skipped_non_reports, skipped_duplicates = scrape_directory(args.input_dir)
+    audit_rows = []
+    inspections, violations, skipped_non_reports, skipped_duplicates = scrape_directory(args.input_dir, audit_rows)
+    audit_path = args.inspections_out.with_name(args.inspections_out.stem + "_pdf_audit.csv")
+    write_csv(audit_path, ["path", "status", "encounter", "id", "inspect_dt"], audit_rows)
     write_csv(args.inspections_out, INSPECTIONS_COLUMNS, inspections)
     write_csv(args.violations_out, VIOLATIONS_COLUMNS, violations)
 
     print(f"Parsed {len(inspections)} unique inspections and {len(violations)} violation rows.")
-    print(f"Skipped {skipped_duplicates} duplicate report(s) and {skipped_non_reports} non-inspection file(s).")
+    print(f"Skipped {skipped_duplicates} duplicate report(s) and {skipped_non_reports} unparsed file(s); see {audit_path}.")
     print(f"Wrote inspections to: {args.inspections_out}")
     print(f"Wrote violations to:  {args.violations_out}")
 

@@ -19,7 +19,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 # Configuration
 REPORT_BASE_URL = "https://appsrv.alleghenycounty.us/reports/rwservlet"
 REPORT_PARAMS = "food_rep_insp&P_ENCOUNTER={encounter}"
-OUTPUT_DIR = Path(__file__).parent.parent / "data" / "inspection_reports"
+OUTPUT_DIR = Path(__file__).resolve().parents[2] / "data" / "inspection_reports"
 METADATA_FILE = OUTPUT_DIR / "downloaded_reports.json"
 
 # Date range 

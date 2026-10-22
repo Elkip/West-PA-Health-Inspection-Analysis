@@ -43,10 +43,10 @@ plot_inspection_activity <- function(inspections, period_label = "2025-2026") {
     scale_fill_manual(values = c("Initial / Comprehensive" = "#172B45", "Follow-up" = "#218C8D", "Other / mixed" = "#B9C8D8")) +
     scale_x_date(date_labels = date_lbl, date_breaks = "1 month") +
     scale_y_continuous(labels = scales::comma, expand = expansion(mult = c(0, 0.12))) +
-    labs(title = "The inspection calendar",
+    labs(title = "The available inspection records",
          subtitle = paste0("Recorded encounters by month and purpose | Allegheny County, ", period_label),
          x = NULL, y = "Inspection encounters",
-         caption = "Source: ACHD / WPRDC historical exports and Accela Citizens Access PDF reports. Includes visits with zero recorded violations.\nVolume reflects recorded inspection activity in the combined dataset, not changes in food safety.") +
+         caption = "Source: ACHD / WPRDC historical exports and Accela PDFs, restricted to permanent-establishment scope.\nPost-transition counts are an incomplete PDF sample, not all county inspections; see the source coverage audit.") +
     theme_portfolio() + theme(panel.grid.major.x = element_blank())
 }
 

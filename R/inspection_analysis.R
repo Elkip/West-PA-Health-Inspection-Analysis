@@ -1,6 +1,7 @@
 # ACHD severity is recorded on each inspection/category row, not fixed by
 # category name. See README.md for source links and interpretation.
 library(dplyr)
+source("R/facility_scope.R")
 
 require_columns <- function(data, columns, label) {
   missing <- setdiff(columns, names(data))
@@ -33,7 +34,7 @@ build_inspection_summaries <- function(violations, inspections) {
   ), "Violations")
   require_columns(inspections, c(
     "encounter", "id", "facility_name", "inspect_dt", "num", "street", "city",
-    "purpose", "placard_desc"
+    "purpose", "placard_desc", "category_cd", "description"
   ), "Inspections")
   if (!nrow(violations) || !nrow(inspections)) stop("Both source tables must contain records.")
 
@@ -90,6 +91,16 @@ build_inspection_summaries <- function(violations, inspections) {
     stop("Unexpected severity flag; expected T, F, or blank.")
   }
 
+  # Apply the same establishment scope to both tables using encounter IDs.
+  # Keep an auditable decision for every encounter, including ambiguous cases.
+  inspections <- classify_facility_scope(inspections)
+  scope_audit <- inspections |>
+    select(encounter, id, facility_name, inspect_dt, category_cd, description,
+           any_of(c("source", "permit_record_id", "facility_type")), IN_PERMANENT_SCOPE, SCOPE_BASIS)
+  inspections <- filter(inspections, IN_PERMANENT_SCOPE)
+  violations <- semi_join(violations, inspections, by = "encounter")
+  if (!nrow(inspections)) stop("No inspections meet the permanent-establishment scope.")
+
   scored <- violations |>
     filter(rating == "V") |>
     mutate(
@@ -123,7 +134,8 @@ build_inspection_summaries <- function(violations, inspections) {
   )
 
   by_inspection <- inspections |>
-    select(encounter, id, facility_name, num, street, city, inspect_dt, purpose, placard_desc) |>
+    select(encounter, id, facility_name, num, street, city, inspect_dt, purpose, placard_desc,
+           category_cd, description, SCOPE_BASIS) |>
     left_join(counts, by = "encounter") |>
     left_join(source_counts, by = "encounter") |>
     mutate(
@@ -185,6 +197,6 @@ build_inspection_summaries <- function(violations, inspections) {
   )
   list(
     inspections = by_inspection, yearly = by_year, category_audit = category_audit,
-    coverage = coverage, excluded_training_facilities = excluded
+    coverage = coverage, excluded_training_facilities = excluded, scope_audit = scope_audit
   )
 }

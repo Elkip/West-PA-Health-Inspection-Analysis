@@ -118,7 +118,7 @@ followup_widget <- function(pairs, period_label) {
          initial_report = row$REPORT, followup_report = row$followup_report,
          initial_encounter = row$encounter, followup_encounter = row$followup_encounter)
   })
-  htmlwidgets::onRender(widget, paste(readLines("assets/followup-interaction.js", warn = FALSE), collapse = "\n"),
+  htmlwidgets::onRender(widget, paste(readLines("reports/assets/followup-interaction.js", warn = FALSE), collapse = "\n"),
                        data = list(records = records))
 }
 

@@ -14,6 +14,7 @@ inspections <- tibble(
     "2025-03-01", "2025-06-01", "2025-07-31", "2025-07-31", "2025-08-01"
   )),
   num = "10", street = "Main Street", city = "Pittsburgh",
+  category_cd = "211", description = "Restaurant without Liquor",
   purpose = c("Initial", "Reinspection", "Initial", "Initial", "Reinspection",
               "Initial", "Initial", "Initial", "Reinspection", "Initial"),
   placard_desc = "Inspected & Permitted"

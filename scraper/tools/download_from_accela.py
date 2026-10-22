@@ -16,7 +16,7 @@ from playwright.async_api import async_playwright, TimeoutError as PlaywrightTim
 # Configuration
 BASE_URL = "https://aca-prod.accela.com/ALLEGHENYCO"
 SEARCH_URL = f"{BASE_URL}/Cap/CapHome.aspx?module=EnvHealth&TabName=Home"
-OUTPUT_DIR = Path(__file__).parent.parent / "data" / "accela_reports"
+OUTPUT_DIR = Path(__file__).resolve().parents[2] / "data" / "accela_reports"
 METADATA_FILE = OUTPUT_DIR / "downloaded_reports.json"
 
 # Date range

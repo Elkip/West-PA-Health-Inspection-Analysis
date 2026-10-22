@@ -1,396 +1,117 @@
-# Allegheny County Food Inspection Analysis 2025
-
-Ranking Recorded Violations in the Available 2025 Data
+# Allegheny County Food Inspection Analysis
 
 Mitchell Henschel
 
+A reproducible analysis of recorded food-safety violations, establishment rankings, and follow-up inspections in Allegheny County. Historical WPRDC exports are combined with assessment reports downloaded from Accela. Interactive charts let readers explore categories and select restaurants to inspect their visit history.
 
+## Start here
 
+- **Report sources:** [2025](reports/2025.qmd) · [2026](reports/2026.qmd)
+- **Methodology and data coverage:** [Permanent-establishment scope and the 2025 source break](docs/data-coverage.md)
+- **Data collection:** [Scraper workflow](scraper/README.md)
 
+The ranking uses inspectors' high/medium/low flags, prioritizes high-severity categories, and retains an analyst-defined 5/3/1 score as a secondary view. Permanent-establishment scope and inspection purpose are handled explicitly. The post-August 2025 PDF sample is incomplete; missing reports are not treated as clean inspections.
 
+## Project layout
 
-# Introduction
+```text
+R/                     Reusable scoring, scope, plotting, and interaction functions
+scripts/               Build summaries and render Markdown reports
+reports/               Annual Quarto sources
+  assets/              Authored JavaScript and CSS for interactive reports
+scraper/               Download, parse, and audit source data
+  tools/               Manual portal exploration and debugging utilities
+docs/                  Methodology and coverage findings
+tests/                 Scoring, scope, scraper, and browser checks
+data/                  Local CSV inputs and downloaded PDFs (ignored)
+out/                   Generated summaries and reports (ignored)
+  reports/             Markdown reports and their generated assets
+  site/                Quarto HTML/PDF output
+_quarto.yml            Shared project paths and annual report list
+Makefile               Shortcuts for the workflow below
+```
 
-This analysis covers **Allegheny County**, not all of Western Pennsylvania. The combined local exports and scraped Accela PDF reports span 2014-01-02 through 2026-10-20. The 2025 results cover **2025-01-02 through 2025-08-29**, with 6,188 inspection encounters and 28,441 recorded violation-category rows.
+## Setup
 
-As a local data scientist, I wanted to make these public records easier to compare while preserving the severity information recorded by inspectors. This ranking is my analytical summary, not an official Health Department grade or an estimate of the probability of foodborne illness.
+Run commands from the **repository root**. Use R 4.1+ (`dplyr` 1.1.0+), Python 3.9+, and Quarto for HTML/PDF rendering. PDF output also requires a TeX installation.
 
-## What the Health Department's categories mean
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r scraper/requirements.txt
+python3 -m playwright install chromium
 
-The [Allegheny County Health Department (ACHD)](https://www.alleghenycounty.us/Services/Health-Department/Food-Safety/Search-Inspection-Reports) describes three severity levels:
+Rscript -e 'install.packages(c("dplyr", "tidyr", "ggplot2", "stringr", "scales", "knitr", "yaml", "plotly", "htmlwidgets", "htmltools"), repos="https://cloud.r-project.org")'
+```
 
-| Severity | Meaning | Examples on ACHD's page |
-|:---|:---|:---|
-| High | Can directly lead to foodborne illness | Unsafe holding/cooking temperatures; improper employee handwashing |
-| Medium | Can increase the chance of foodborne illness | No soap at handwashing sinks; no food probe thermometer; no Certified Food Protection Manager present |
-| Low | Usually does not cause foodborne illness on its own; concerns cleanliness, safety, or maintenance | Damaged floors, poorly maintained ventilation hoods, poor lighting |
+## Workflow
 
-These are examples, not a fixed severity lookup for all findings in a category. The original ranking assigned floors and lighting 4 points, a missing manager 5, and thermometers 1; those assignments did not reflect the recorded severity. The revised analysis uses the CSV's **`high`, `medium`, and `low` flags for each inspection/category**, rather than guessing from `description_new`.
+### 1. Acquire the inputs
 
-## Counting and ranking rules
+Download the two historical resources from [WPRDC](https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations) into:
 
-1. **Only `rating = V` is a violation.** Other assessment rows are excluded even if severity flags remain populated. For example, the [Party Cake Shop report of February 19, 2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202502190003) lists eight violation categories; its CSV also has a non-violation thermometer row. The revised pipeline counts eight, not nine.
-2. **Count categories, not individual findings.** Each row is an inspection/category pair; one category can describe several problems. When multiple severity flags are true, assign that category its highest recorded severity (high, then medium, then low). Thus H, M, and L below are mutually exclusive category counts and may differ from the report's counts of all checked severity boxes.
-3. **Keep unclassified violations visible.** A `V` row with no true severity flag is unclassified (U), not low risk or a zero-risk finding. H + M + L + U equals the number of violation categories. In this period, 1,100 categories are unclassified across 972 encounters. Rankings based on known severities may understate those encounters.
-4. **Primary ranking: H, then M, then L, descending.** More high-severity categories rank ahead of any number of lower-severity categories. This is an explicit analytical choice to prioritize severity; ACHD does not prescribe this ordering of facilities. Identical H/M/L profiles share a rank. Dates and encounter IDs only stabilize display order; a top-20 display can cut a tie.
-5. **Secondary score: 5H + 3M + L.** These are analyst-selected weights, not ACHD weights or measured risk ratios. The **known-severity score** omits unclassified categories and is incomplete wherever U > 0. It measures recorded category burden, not safety. No median or quartile is labeled a “clean” or “acceptable” threshold.
+- `data/wprdc_inspections.csv` — historical inspections, resource `4ea730d8-2bf9-4783-b0a5-b41ed687097e`
+- `data/wprdc_violations.csv` — historical violations, resource `1a1329e2-418c-4bd3-af2c-cc334e7559af`
 
-## Comparison population and data quality
+To collect or refresh Accela attachments:
 
-- Link the inspection and violation exports by **`encounter`**, and group facilities by **`id`**. Names and street addresses are display labels, not identifiers. Separate encounters on the same date remain separate inspections.
-- Include encounters from the inspection export even when there are no matching `V` rows. There are 1,162 such encounters in this period. “Zero recorded violations” is a database result, not proof that every condition was assessed or satisfactory.
-- Compare facilities primarily using the mean H/M/L profile of routine visits whose purpose is **“Initial”** (or **“Comprehensive”** in the new Accela system). Reinspections, complaints, new-facility visits, and mixed-purpose encounters can have different scopes. All-encounter averages remain descriptive context. Even Initial/Comprehensive visits are not a random or fully standardized sample, and facilities with one visit have limited evidence.
-- Restrict processing to the overlapping observed date range of the two exports. This guards against treating later inspections as clean when the violation feed ends earlier; it cannot prove that either export is complete within that range.
-- Exclude explicit training-client names by facility ID and export the exclusion list for review. Retain legitimate names such as “Latest Scoop” and “Getgo Corporate Office & Test Kitchen.” Duplicate encounter/category rows, invalid severity flags, and unmatched inspection metadata stop processing instead of silently changing rankings.
+```bash
+python3 scraper/accela_scraper.py --refresh-records
+```
 
-The [WPRDC dataset](https://data.wprdc.org/dataset/allegheny-county-restaurant-food-facility-inspection-violations) provides both historical exports through July 2025. ACHD changed software on **August 11, 2025**; later reports are available as PDF attachments through [Citizens Access](https://aca-prod.accela.com/ALLEGHENYCO/Cap/CapHome.aspx?module=EnvHealth&TabName=Home) and are extracted into the combined dataset via `scraper/scrape_pdfs.py`. Historical report links and inspection placards describe those visits, not a facility's current status.
+This searches permanent permits and stores PDFs and download metadata under `data/accela_downloads/`. See the [scraper guide](scraper/README.md) for discovery and retry details.
 
+### 2. Parse, combine, and summarize
 
-# Stats for Nerds
+```bash
+python3 scraper/scrape_pdfs.py --combine
+Rscript scripts/build_summaries.R
+```
 
-Distribution of known-severity scores for all recorded inspection encounters in the available 2025 period, including zero-recorded-violation visits:
+The parser writes the combined `data/inspections.csv` and `data/violations.csv`. The R pipeline writes inspection/year summaries, severity counts, coverage, and scope decisions to `out/`.
 
-![](2025_hall_of_shame_markdown_files/figure-commonmark/unnamed-chunk-2-1.png)<!-- -->
+### 3. Check coverage
 
+```bash
+python3 scraper/audit_coverage.py --refresh
+```
 
+This compares the local PDF sample with the separately cached restored WPRDC inventory. Review `out/source_coverage_audit.json`, `out/source_coverage_by_month.csv`, and `out/inspection_scope_audit.csv` alongside the [coverage findings](docs/data-coverage.md).
 
-Table: Known-severity score summary (all purposes)
+### 4. Render the reports
 
-|Statistic | Score|
-|:---------|-----:|
-|Min       |  0.00|
-|Q1        |  1.00|
-|Median    |  5.00|
-|Mean      |  7.96|
-|Q3        | 12.00|
-|Max       | 59.00|
+```bash
+# Both annual Markdown reports; no Quarto or TeX required
+Rscript scripts/render_reports.R
 
-For facility comparisons, use only Initial/Comprehensive inspections and retain zero-recorded-violation visits in the denominator. This distribution gives each facility one observation: its mean known-severity score over its Initial/Comprehensive inspections in the available period.
+# Both interactive HTML reports
+quarto render --to html
+```
 
-![](2025_hall_of_shame_markdown_files/figure-commonmark/unnamed-chunk-4-1.png)<!-- -->
+| Format | Generated files |
+|:--|:--|
+| Markdown | `out/reports/2025.md`, `out/reports/2026.md` |
+| Markdown assets | `out/reports/2025_markdown_files/`, `out/reports/2026_markdown_files/` |
+| Interactive HTML | `out/site/reports/2025.html`, `out/site/reports/2026.html` |
+| PDF (`quarto render --to pdf`) | `out/site/reports/2025.pdf`, `out/site/reports/2026.pdf` |
 
+Open the HTML files in a browser to use hover, zoom, and restaurant selection. Each HTML report embeds its chart dependencies. Generated reports and Markdown assets are kept locally and excluded from Git; commit the Quarto sources and authored assets instead.
 
+For one year, use `Rscript scripts/render_reports.R 2025` or `quarto render reports/2025.qmd --to html`. Render only years represented in your input data.
 
-Table: Facility mean score summary (Initial/Comprehensive inspections only)
+## Shortcuts and checks
 
-|Statistic | Score|
-|:---------|-----:|
-|Min       |  0.00|
-|Q1        |  2.00|
-|Median    |  7.00|
-|Mean      |  9.39|
-|Q3        | 14.00|
-|Max       | 59.00|
+With dependencies installed and the Python environment activated:
 
-## Sensitivity to the ranking method
-
-The severity-first and 5/3/1 weighted top-20 inspection lists share **12 of 20** encounters. Changing the weights to 3/2/1 retains **18 of 20** encounters from the 5/3/1 list. These are descriptive sensitivity checks with deterministic tie-breaking, not statistical confidence measures. The main severity-first ranking does not depend on numerical weights.
-
-# A Visual Tour of the Findings
-
-The HTML report adds hover details, zoom controls, and clickable follow-up bubbles. Render it with `quarto render 2025_hall_of_shame.qmd --to html` and open `2025_Health_Inspections_Interactive.html` in a browser. GitHub's README preview and the PDF use static images. The HTML file is self-contained and can be shared or hosted as a portfolio page.
-
-## Inspection activity and scope
-
-Inspection volume and purpose provide context for the rankings. The chart counts every recorded encounter, including visits with no recorded violations. “Follow-up” includes the exact purposes Reinspection and Partial ReInspection; mixed-purpose visits are grouped with other visits. These monthly counts describe activity in the combined dataset, not a trend in restaurant safety.
-
-<img src="2025_hall_of_shame_markdown_files/figure-commonmark/inspection-calendar-1.png" alt="Monthly stacked columns showing Initial/Comprehensive, follow-up, and other inspection encounters in 2025."  />
-
-## Why category names alone cannot determine severity
-
-Each row below shows the severity mix within one of the 15 most frequently cited categories. A darker cell means a larger share of that category's violation records, not a more dangerous category. The variation is why this analysis uses the inspector's recorded flags instead of assigning every occurrence of a category the same severity.
-
-<img src="2025_hall_of_shame_markdown_files/figure-commonmark/category-severity-1.png" alt="Heatmap of the 15 most frequently cited categories, showing percentages classified as high, medium, low, or unclassified."  />
-
-## The composition behind the ranking
-
-The bars below show the mean number of categories at each severity for the top 15 facilities in the Initial/Comprehensive ranking. Facilities are ordered by their severity profile, not by total bar length. The annotations retain the inspection denominator and the number of unclassified categories so the limits of each comparison remain visible.
-
-<img src="2025_hall_of_shame_markdown_files/figure-commonmark/facility-severity-profiles-1.png" alt="Horizontal stacked bars showing mean high-, medium-, and low-severity category counts for the 15 highest-ranked facilities on Initial/Comprehensive inspections."  />
-
-## What happens at the next recorded follow-up?
-
-Match an Initial/Comprehensive visit to the very next recorded encounter for the same facility only when that encounter is a Reinspection or Partial ReInspection on a later date. Keep the earliest eligible pair per facility within the available 2025 period, then exclude pairs with unclassified categories at either visit. This is chronological matching, not a verified administrative link between reports. Same-day pairs are excluded because the analysis does not use visit times.
-
-Below the diagonal, the follow-up score is lower than the Initial score. Bubble area represents the number of facilities at the same coordinates. These facilities are a selected group that received follow-up visits; changes can reflect both corrections and narrower follow-up scope.
-
-In the HTML version, **hover over a bubble to preview restaurant names; click it to see every facility at that coordinate**, including both visit dates, scores, and report links. The dropdown below the chart also lets you select a facility using a keyboard or touch screen. Accela search links are labeled as searches and include the encounter identifier.
-
-<img src="2025_hall_of_shame_markdown_files/figure-commonmark/followup-comparison-1.png" alt="Bubble scatterplot comparing Initial and next recorded follow-up scores, with a diagonal reference line for unchanged scores."  />
-
-# 2025 Rankings
-
-Click a facility name for the linked report. **H/M/L** are category counts at the highest recorded severity; **U** is the number of unclassified categories. The tables describe recorded conditions during this period, not current operating conditions.
-
-## Inspections ranked by recorded severity
-
-Table: Top 20 inspection encounters by H, then M, then L
-
-|Facility                                                      | Rank|Date       |Purpose            |  H|  M|  L|  U|
-|:-------------------------------------------------------------|----:|:----------|:------------------|--:|--:|--:|--:|
-|[Enson Market - 7511 Thomas Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507100056)|    1|2025-07-10 |Reinspection       |  7|  6|  6|  1|
-|[Nepali Asian Restaurant - 2122 Brownsville Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501090031)|    2|2025-01-09 |Initial            |  6|  7|  8|  1|
-|[MiFan - 5923 Baum Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504170010)|    3|2025-04-17 |Initial            |  6|  4|  2|  1|
-|[How Lee - 5888 Forbes Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503170111)|    4|2025-03-17 |Initial, Complaint |  6|  3|  9|  0|
-|[Rose Tea Cafe Express - 414 Craig Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501020012)|    5|2025-01-02 |Initial            |  6|  3|  8|  1|
-|[The Mintt - 3033 Banksville Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210035)|    6|2025-04-21 |Initial, Complaint |  5|  6| 10|  0|
-|[Turkish Kebab House - 5819 Forbes Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506050027)|    7|2025-06-05 |Initial            |  5|  6|  7|  1|
-|[Dive Bar & Grille - 2132 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506130009)|    8|2025-06-13 |Initial            |  5|  5|  9|  0|
-|[Sambok Korean Grocery - 1735-1737 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501030016)|    9|2025-01-03 |Initial            |  5|  5|  8|  0|
-|[Fun Asian Bistro - 11655 Frankstown Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010031)|   10|2025-07-01 |Initial            |  5|  4| 12|  0|
-|[The Library - 2302-2304 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180056)|   11|2025-03-18 |Initial            |  5|  4| 11|  0|
-|[The Fireside Inn - 4214 Steubenville Pike, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503190039)|   12|2025-03-19 |Initial, Complaint |  5|  4|  7|  1|
-|[Mintt Indian Cuisine - 3747 William Penn Highway, Monroeville](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503060024)|   12|2025-03-06 |Initial            |  5|  4|  7|  1|
-|[Wai Wai Chinese Cuisine - 4717  Liberty  Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504230042)|   14|2025-04-23 |Initial            |  5|  4|  6|  0|
-|[Longue Vue Club - 400 Longue Vue  Drive, Verona](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507230023)|   15|2025-07-23 |Initial            |  5|  3|  8|  0|
-|[Everyday Noodles - 5875 Forbes  Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506180024)|   16|2025-06-18 |Initial, Complaint |  5|  3|  7|  0|
-|[Taste of India - 4320 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503200033)|   17|2025-03-20 |Initial            |  5|  3|  3|  0|
-|[Caravan - 10 Smithfield Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507100050)|   18|2025-07-10 |Complaint          |  5|  3|  0|  1|
-|[Tram's Kitchen - 4050 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202502190031)|   19|2025-02-19 |Initial            |  5|  2|  7|  0|
-|[J G 's Tarentum Station Grille - 101 Station Drive, Tarentum](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140037)|   20|2025-07-14 |Initial            |  5|  2|  6|  0|
-
-## Secondary view: weighted category burden
-
-This list allows several lower-severity categories to outweigh a higher-severity category. It answers a different question from the main ranking. The score is incomplete when U > 0.
-
-Table: Top 20 encounters by known-severity score (5H + 3M + L)
-
-|Facility                                                                            |Date       |Purpose               | Score|  H|  M|  L|  U|
-|:-----------------------------------------------------------------------------------|:----------|:---------------------|-----:|--:|--:|--:|--:|
-|[Enson Market - 7511 Thomas Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507100056)|2025-07-10 |Reinspection          |    59|  7|  6|  6|  1|
-|[Nepali Asian Restaurant - 2122 Brownsville Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501090031)|2025-01-09 |Initial               |    59|  6|  7|  8|  1|
-|[Diners 2+1 - 1722 Murray Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180044)|2025-03-18 |Initial               |    55|  4|  8| 11|  0|
-|[Lucca Ristorante & Wine Bar - 317 Craig  Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010017)|2025-07-01 |Initial               |    53|  4|  7| 12|  0|
-|[The Mintt - 3033 Banksville Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210035)|2025-04-21 |Initial, Complaint    |    53|  5|  6| 10|  0|
-|[Shannopin Country Club Restaurant - 1 Windmere Rd, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507150047)|2025-07-15 |Initial               |    51|  4|  7| 10|  1|
-|[Turkish Kebab House - 5819 Forbes Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506050027)|2025-06-05 |Initial               |    50|  5|  6|  7|  1|
-|[Zen Asian Diner - 5100 Butler Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140064)|2025-07-14 |Initial               |    49|  4|  7|  8|  0|
-|[Fun Asian Bistro - 11655 Frankstown Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010031)|2025-07-01 |Initial               |    49|  5|  4| 12|  0|
-|[Dive Bar & Grille - 2132 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506130009)|2025-06-13 |Initial               |    49|  5|  5|  9|  0|
-|[The Library - 2302-2304 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180056)|2025-03-18 |Initial               |    48|  5|  4| 11|  0|
-|[How Lee - 5888 Forbes Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503170111)|2025-03-17 |Initial, Complaint    |    48|  6|  3|  9|  0|
-|[Sambok Korean Grocery - 1735-1737 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501030016)|2025-01-03 |Initial               |    48|  5|  5|  8|  0|
-|[Hastina Royal Indian Cuisine - 1120 Park Manor Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506110018)|2025-06-11 |Initial, New Facility |    47|  3|  7| 11|  1|
-|[Yue Bai Wei - 5874 Forbes Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202505050047)|2025-05-05 |Initial               |    47|  3|  8|  8|  0|
-|[Rose Tea Cafe Express - 414 Craig Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501020012)|2025-01-02 |Initial               |    47|  6|  3|  8|  1|
-|[China Buffet King - 2249 Noblestown Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202505080030)|2025-05-08 |Initial, Complaint    |    46|  4|  6|  8|  0|
-|[Montour Heights Country Club Restaurant - 1491 Coraopolis Heights  Road, Coraopolis](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506170033)|2025-06-17 |Initial, Complaint    |    44|  4|  5|  9|  0|
-|[MiFan - 5923 Baum Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504170010)|2025-04-17 |Initial               |    44|  6|  4|  2|  1|
-|[The Fireside Inn - 4214 Steubenville Pike, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503190039)|2025-03-19 |Initial, Complaint    |    44|  5|  4|  7|  1|
-
-## Facilities ranked using Initial/Comprehensive inspections
-
-Order facilities by mean H, then mean M, then mean L across Initial/Comprehensive inspections only. **N** is the number of those inspections; **U** is their total unclassified category count. A high mean based on N = 1 does not establish a pattern of repeated problems. Links go to each facility's latest recorded encounter in the period, which may be a reinspection rather than an Initial visit.
-
-Table: Top 20 facilities by mean Initial/Comprehensive-inspection severity profile
-
-|Facility                                                            | Rank|  N| Mean H| Mean M| Mean L|  U|
-|:-------------------------------------------------------------------|----:|--:|------:|------:|------:|--:|
-|[Nepali Asian Restaurant - 2122 Brownsville Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202502190018)|    1|  1|      6|      7|      8|  1|
-|[MiFan - 5923 Baum Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504290057)|    2|  1|      6|      4|      2|  1|
-|[Turkish Kebab House - 5819 Forbes Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507090039)|    3|  1|      5|      6|      7|  1|
-|[Dive Bar & Grille - 2132 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507080031)|    4|  1|      5|      5|      9|  0|
-|[Sambok Korean Grocery - 1735-1737 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501030016)|    5|  1|      5|      5|      8|  0|
-|[Fun Asian Bistro - 11655 Frankstown Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507080023)|    6|  1|      5|      4|     12|  0|
-|[The Library - 2302-2304 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210045)|    7|  1|      5|      4|     11|  0|
-|[Mintt Indian Cuisine - 3747 William Penn Highway, Monroeville](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503200053)|    8|  1|      5|      4|      7|  1|
-|[Wai Wai Chinese Cuisine - 4717  Liberty  Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202505080029)|    9|  1|      5|      4|      6|  0|
-|[Longue Vue Club - 400 Longue Vue  Drive, Verona](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507230023)|   10|  1|      5|      3|      8|  0|
-|[Taste of India - 4320 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503210025)|   11|  1|      5|      3|      3|  0|
-|[Tram's Kitchen - 4050 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507150046)|   12|  1|      5|      2|      7|  0|
-|[J G 's Tarentum Station Grille - 101 Station Drive, Tarentum](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507210053)|   13|  1|      5|      2|      6|  0|
-|[Dive Bar & Grille - 5147 Butler Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140048)|   14|  1|      5|      1|     11|  0|
-|[8 Star Cuisine - 5375 William Flynn Highway, Gibsonia](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506040027)|   15|  1|      5|      0|      1|  0|
-|[Diners 2+1 - 1722 Murray Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504070051)|   16|  1|      4|      8|     11|  0|
-|[Lucca Ristorante & Wine Bar - 317 Craig  Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507100002)|   17|  1|      4|      7|     12|  0|
-|[Shannopin Country Club Restaurant - 1 Windmere Rd, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507150047)|   18|  1|      4|      7|     10|  1|
-|[Zen Asian Diner - 5100 Butler Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140064)|   19|  1|      4|      7|      8|  0|
-|[Osaka Sushi & Chinese Restaurant - 2101 Greentree  Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507180015)|   20|  1|      4|      5|      7|  0|
-
-## Follow-up context for those facilities
-
-For the same facilities, **N** counts all encounter purposes and **Mean** is the all-encounter mean known-severity score, including zero-recorded-violation visits. **Latest** is the score for the linked encounter; **U** is its unclassified category count. The mean also omits unclassified categories on earlier visits; their totals are retained in the CSV. A lower follow-up score can reflect corrections or a narrower inspection scope, so it does not prove that all previous problems were resolved.
-
-Table: All-encounter and latest-visit context for the facilities above
-
-|Facility                                                            |  N|  Mean|Date       |Purpose              | Latest|  U|
-|:-------------------------------------------------------------------|--:|-----:|:----------|:--------------------|------:|--:|
-|[Nepali Asian Restaurant - 2122 Brownsville Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202502190018)|  4| 20.75|2025-02-19 |Reinspection         |     14|  0|
-|[MiFan - 5923 Baum Boulevard, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504290057)|  2| 23.00|2025-04-29 |Reinspection         |      2|  0|
-|[Turkish Kebab House - 5819 Forbes Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507090039)|  6| 13.67|2025-07-09 |Partial ReInspection |      0|  0|
-|[Dive Bar & Grille - 2132 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507080031)|  2| 30.00|2025-07-08 |Reinspection         |     11|  0|
-|[Sambok Korean Grocery - 1735-1737 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501030016)|  1| 48.00|2025-01-03 |Initial              |     48|  0|
-|[Fun Asian Bistro - 11655 Frankstown Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507080023)|  2| 24.50|2025-07-08 |Partial ReInspection |      0|  0|
-|[The Library - 2302-2304 Carson Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210045)|  2| 37.00|2025-04-21 |Reinspection         |     26|  0|
-|[Mintt Indian Cuisine - 3747 William Penn Highway, Monroeville](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503200053)|  2| 30.00|2025-03-20 |Reinspection         |     16|  1|
-|[Wai Wai Chinese Cuisine - 4717  Liberty  Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202505080029)|  2| 29.00|2025-05-08 |Reinspection         |     15|  0|
-|[Longue Vue Club - 400 Longue Vue  Drive, Verona](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507230023)|  1| 42.00|2025-07-23 |Initial              |     42|  0|
-|[Taste of India - 4320 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503210025)|  2| 18.50|2025-03-21 |Partial ReInspection |      0|  0|
-|[Tram's Kitchen - 4050 Penn Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507150046)|  3| 12.67|2025-07-15 |Service Request      |      0|  0|
-|[J G 's Tarentum Station Grille - 101 Station Drive, Tarentum](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507210053)|  2| 22.50|2025-07-21 |Partial ReInspection |      8|  0|
-|[Dive Bar & Grille - 5147 Butler Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140048)|  2| 21.00|2025-07-14 |Reinspection         |      3|  0|
-|[8 Star Cuisine - 5375 William Flynn Highway, Gibsonia](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506040027)|  2| 14.50|2025-06-04 |Initial              |     26|  0|
-|[Diners 2+1 - 1722 Murray Avenue, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504070051)|  5| 24.00|2025-04-07 |Reinspection         |     11|  0|
-|[Lucca Ristorante & Wine Bar - 317 Craig  Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507100002)|  2| 32.50|2025-07-10 |Reinspection         |     12|  0|
-|[Shannopin Country Club Restaurant - 1 Windmere Rd, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507150047)|  1| 51.00|2025-07-15 |Initial              |     51|  1|
-|[Zen Asian Diner - 5100 Butler Street, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140064)|  1| 49.00|2025-07-14 |Initial              |     49|  0|
-|[Osaka Sushi & Chinese Restaurant - 2101 Greentree  Road, Pittsburgh](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507180015)|  2| 26.00|2025-07-07 |Reinspection         |     10|  0|
-
-
-# Discussion
-
-The category summaries cannot convey all the detail in an inspector's narrative. Here are selected excerpts from the historical reports, along with each encounter's severity-first rank, weighted-score rank, and placard status:
-
-**[Lucca Ristorante & Wine Bar, Craig St, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010017)** *(Severity Rank #25, Weighted Score Rank #4 — Consumer Alert)*:
-
-- There are bottles of liquor stored beneath and contaminated by an unknown water source from
-the active ceiling leak behind the bar. The operator voluntarily moved the affected bottles to a safe
-storage location and discontinued service behind the bar.
-
-**[The Library, Carson St, 03/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180056)** *(Severity Rank #11, Weighted Score Rank #11 — Inspected & Permitted)*:
-
--  Numerous rodent droppings [in 6 areas]... Nesting material was identified [in 4 areas]... Loose bait found in kitchen and basement.
-
-- Black mold-like substance and a pink biofilm was identified on the ice machine deflector plate
-and surrounding areas.
-
-- Oyster and chicken breading preparation cooler interior has excessive amounts of old food debris.
-
-- It was discovered that the dish machine is not functioning properly and is failing to sanitize
-effectively. The chlorine readout measured at 0.00 PPM. Owner initiated a phone call for repairs.
-
-**[Zen Asian Diner, Butler St, 07/14/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507140064)** *(Severity Rank #27, Weighted Score Rank #8 — Inspected & Permitted)*:
-
-- In basement, there is a decayed corpse of an animal, about the size of a possum or large rat.
-Unable to determine the type of animal during inspection.
-
-- Too many flies to count found throughout all food preparation areas of entire facility.
-
-- The garage that holds the dumpster and grease receptacle has a door that leads directly into the
-food preparation room and that door does not seal.
-
-*REPEAT VIOLATIONS*
-
-**[Fun Asian Bistro, Frankstown Rd, 07/01/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202507010031)** *(Severity Rank #10, Weighted Score Rank #8 — Inspected & Permitted)*:
-
-- Did not observe any employee handwashing during inspection.
-
-- Employee observed eating on cookline.
-
-- Temperature/Time Controlled for Safety (TCS) foods such as tofu, beef, chicken, cooked noodles,
-and cooked rice were found between 45-55F in the two-door and three-door prep coolers. All foods
-discarded.
-
-- Cooked chicken by grill had a temperature of 75F. Owner says it was cooked this morning.
-Discarded during inspection. *REPEAT VIOLATION*
-
-
-**[Hastina Royal Indian Cuisine, Park Manor Boulevard, 06/11/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506110018)** *(Severity Rank #69, Weighted Score Rank #14 — Consumer Alert)*:
-
-- Facility is open and operating without a valid health permit.
-
-- Facility failed to submit plans for a change of ownership and transfer of a sister LLC.
-
-- Consumer alert administered during inspection due to several high and medium risk violations.
-
-
-**[The Mintt, Banksville Rd, 04/21/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504210035)** *(Severity Rank #6, Weighted Score Rank #4 — Consumer Alert)*:
-
-- In the walk-in cooler, a container of raw lamb was observed stored behind a loosely covered bowl
-of dough. Blood was observed to have dripped onto the plastic wrap covering a bowl of pudding.
-
-**[Kirkland's Bussin Kitchen, Broadway Ave, 05/15/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202505150031)** *(Severity Rank #719, Weighted Score Rank #439 — Ordered To Close)*:
-
-- Facility lacks hot water. Operator reports that water service was interrupted when the account was switched over.
-
-- The handwashing sink in the kitchen was clogged with food at the beginning of the inspection.
-
-- Home-style cooking appliances are in use including a rice cooker, tabletop fryer, and Blackstone flat top grills.
-
-- Facility was smoky upon arrival due to the ventilation hood not being turned on during cooking and cooking equipment not being under the hood.
-
-- Facility is ordered closed. Do not conceal, remove, or cover the closure placard.
-
-**[Nepali Asian Restaurant, Brownsville Rd, 01/09/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501090031)** *(Severity Rank #2, Weighted Score Rank #1 — Ordered To Close)*:
-
-- More than 5 dead fruit flies found in open bag of all-purpose flour. Discarded.
-
-- Dried German cockroach found in sixth size hotel pan of salt above 2 door prep cooler.
-
-- Live juvenile German cockroach found in container of white rice on dry storage shelving in kitchen.
-
-- Greater than 5 adult live cockroaches observed on dry pasta in opened packaging. Discarded.
-
-- Three cans of aerosol roach spray and one gallon sized pump sprayer of insecticide observed in kitchen.
-
-**[MiFan, Baum Blvd, 04/17/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202504170010)** *(Severity Rank #3, Weighted Score Rank #18 — Inspected & Permitted)*:
-
-- Facility is reusing raw chicken boxes to store cooked egg rolls and bags of spices. Discarded. *REPEAT VIOLATION*
-
-- In the walk-in freezer, there are approximately 20 black trash bags filled with cooked chicken wings.
-
-- A bucket of soapy water was stored on top of the bulk flour ingredient bin in the kitchen.
-
-- Sanitizer buckets in the kitchen all contained 0ppm of chlorine sanitizer.
-
-**[Everyday Noodles, Forbes Ave, 06/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506180024)** *(Severity Rank #16, Weighted Score Rank #30 — Consumer Alert)*:
-
-- One bag of onions on a sheet tray on the bottom shelf of the speed rack in the basement observed resting on top of fresh rodent droppings, and fresh rodent droppings observed inside bag. Bag of onions discarded.
-
-- One soy sauce bucket with no lid in the dry storage area re-used to store Panko observed with a rodent dropping on the surface of the panko. Panko discarded.
-
-- One sheet tray, contaminated by rodent droppings, not sanitized before being returned to storage.
-
-- One live mouse observed on a glue trap behind the water heater... One dead and decomposed mouse observed on floor beneath dry storage shelves.
-
-
-**[Diners 2+1, Murray Ave, 03/18/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202503180044)** *(Severity Rank #24, Weighted Score Rank #3 — Inspected & Permitted)*:
-
-- Two bulk bags of sugar in the side dry storage room observed with packages gnawed at the bottom, sugar spilling out, and rodent droppings adjacent. Both bags discarded during inspection.
-
-- One case of unidentifiable produce (possibly peppers) severely covered in a white, fuzzy, mold-like substance in the Coke merch cooler. Discarded during inspection.
-
-- ~10 fresh rodent droppings observed in both deep fryer cabinets.
-
-**[Dive Bar & Grille, Carson St, 06/13/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202506130009)** *(Severity Rank #8, Weighted Score Rank #8 — Inspected & Permitted)*:
-
-- Freshly dead mouse found in customer seating area upstairs... Three dead mice found on a glue board underneath the two-bowl sink... Two dead mice found in basement.
-
-- At upstairs bar, fresh rodent droppings observed in old prep cooler that is now a storage area.
-
-- Soda gun on right side of first floor bar and two soda gun holsters have brown, slime-like substance in them.
-
-**[Sambok Korean Grocery, Penn Ave, 01/03/2025](https://appsrv.alleghenycounty.us/reports/rwservlet?food_rep_insp&P_ENCOUNTER=202501030016)** *(Severity Rank #9, Weighted Score Rank #11 — Inspected & Permitted)*:
-
-- Observed staff washing hands in three (3) compartment sink with washed napa cabbage present in the sink.
-
-- Four burner range has a red tag by the gas company. Do not use this equipment.
-
----
-
-Health inspections are a snapshot of how a food facility is operating at a specific point in time, not a permanent verdict. Severity, inspection scope, and follow-up findings matter more than a single league-table position. Read the full report and check recent inspections before drawing conclusions about a facility today.
-
-Questions and suggestions on my methodology are welcome. Thanks for reading!
-
-[Source code](https://github.com/Elkip/West-PA-Health-Inspection-Analysis/tree/master)
-
-[Original Google Sheets export (may use the earlier methodology)](https://docs.google.com/spreadsheets/d/14fzHPMQwi2yXgINs_aTp1Vy-1ni_tRFI3wfmFX-IPXc)
-
-# Reproducing the Analysis
-
-Interactive HTML additionally requires `plotly`, `htmlwidgets`, and `htmltools`: install them with `install.packages(c("plotly", "htmlwidgets", "htmltools"))`. With Quarto installed, run `quarto render 2025_hall_of_shame.qmd --to html`. The generated HTML embeds its JavaScript and works offline; opening the linked inspection reports requires internet access.
-
-Use R 4.1 or later with `dplyr` (1.1.0 or later), `tidyr`, `ggplot2`, `stringr`, `scales`, and `knitr`. Packages must be built for a compatible version of R. From the repository root:
-
-1. Save the [historical violation export](https://data.wprdc.org/datastore/dump/1a1329e2-418c-4bd3-af2c-cc334e7559af) as `data/wprdc_violations.csv` and the matching [historical inspection export](https://data.wprdc.org/datastore/dump/4ea730d8-2bf9-4783-b0a5-b41ed687097e) as `data/wprdc_inspections.csv`, then run `python3 scraper/scrape_pdfs.py --combine` to extract the Accela PDF reports (`data/accela_inspections.csv` and `data/accela_violations.csv`) and merge both sources into `data/inspections.csv` and `data/violations.csv`.
-2. Run `Rscript clean_inspections.r` to generate the summaries in `out/`.
-3. Run `Rscript tests/test_inspection_analysis.R` to check scoring and aggregation, including two comparisons with original inspection PDFs when the local exports are available. Run `Rscript tests/test_followup_matching.R` to check the follow-up chart's matching rules.
-4. Run `Rscript render_readme.r` to regenerate `README.md` (and `2026_README.md`) and plots from the Quarto documents. For a PDF, install Quarto and a TeX distribution and run `quarto render 2025_hall_of_shame.qmd --to pdf` or `quarto render 2026_hall_of_shame.qmd --to pdf`.
-
-Generated files:
-
-- `out/violations_by_inspection.csv`: all encounters in the shared export window, purpose, severity counts, unclassified counts, known-severity score, and `SCORE_COMPLETE` (whether every recorded violation category has a severity).
-- `out/violations_by_year.csv`: facility/year summaries, Initial/Comprehensive-only and all-encounter means, denominators, and latest-report context within each year.
-- `out/category_severity_audit.csv`: recorded severity distribution by category and year across the shared window; the visualizations use only 2025.
-- `out/coverage.csv`: date bounds and record counts after training-client exclusions.
-- `out/excluded_training_facilities.csv`: excluded facility identifiers and names.
+```bash
+make summaries     # Build summary CSVs from the combined inputs
+make markdown      # Build summaries and Markdown reports
+make html          # Build summaries and interactive HTML reports
+make audit         # Build summaries and refresh the WPRDC coverage audit
+make test          # Run offline R and Python checks
+make check-html    # Render HTML and run browser interaction checks
+```
+
+The browser check uses `/usr/bin/chromium`. You can choose a Python interpreter explicitly, for example `make test PYTHON=.venv/bin/python`.
+
+See [tests/README.md](tests/README.md) for individual checks and their prerequisites. Live portal debugging scripts are in [scraper/tools/](scraper/tools/README.md).

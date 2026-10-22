@@ -1,6 +1,22 @@
+# Local inputs and generated analysis/report outputs
+/data/
 /out/
 /.quarto/
-/*_Health_Inspections_Interactive.html
-/*_hall_of_shame_files/
-/data/
-/2025_West_PA_Health_Violations.pdf
+
+# Generated Markdown and Quarto support directories, at any depth
+*_markdown_files/
+*_README_files/
+*_hall_of_shame_files/
+/reports/*_files/
+
+# Rendered artifacts
+*.html
+*.pdf
+*.png
+
+# Local environments and Python bytecode
+/.venv/
+__pycache__/
+*.pyc
+
+**/*.quarto_ipynb

@@ -1,0 +1,9 @@
+project:
+  type: default
+  output-dir: out/site
+  execute-dir: project
+  render:
+    - reports/2025.qmd
+    - reports/2026.qmd
+  resources:
+    - docs/data-coverage.md

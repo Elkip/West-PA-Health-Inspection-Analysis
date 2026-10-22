@@ -2,15 +2,17 @@
 """
 Allegheny County Accela Citizens Access Health Inspection Scraper
 
-Downloads inspection reports (PDF attachments) from permits dated August 2025 onwards.
+Downloads inspection reports from all Permanent Food Facility Permit records.
+Permit creation dates are not inspection dates; discovery has no date filter.
 Requires: pip install playwright
 Then run: playwright install chromium
 """
 
 import asyncio
+import argparse
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
@@ -20,10 +22,6 @@ BASE_URL = "https://aca-prod.accela.com/ALLEGHENYCO"
 SEARCH_URL = f"{BASE_URL}/Cap/CapHome.aspx?module=EnvHealth&TabName=Home"
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "accela_downloads"
 METADATA_FILE = OUTPUT_DIR / "inspection_metadata.json"
-
-# Date range - August 2025 onwards (when ACHD switched to Accela)
-START_DATE = datetime(2025, 8, 11)
-END_DATE = datetime.now()
 
 # Timeouts (milliseconds)
 DEFAULT_TIMEOUT = 15000
@@ -42,12 +40,12 @@ async def setup_browser(playwright):
     return browser, context
 
 
-async def start_search(page, start_date: datetime, end_date: datetime):
+async def start_search(page):
     """
-    Start a search for Permanent Food Facility Permit records.
+    Start a search for ALL Permanent Food Facility Permit records (no date filter).
     Returns True if search succeeded.
     """
-    print(f"Searching {start_date.date()} to {end_date.date()}...")
+    print("Searching for all Permanent Food Facility Permits...")
     
     try:
         await page.goto(SEARCH_URL, timeout=DEFAULT_TIMEOUT)
@@ -58,16 +56,19 @@ async def start_search(page, start_date: datetime, end_date: datetime):
     
     await asyncio.sleep(1)
     
-    # Set date range
-    await page.fill('#ctl00_PlaceHolderMain_generalSearchForm_txtGSStartDate', start_date.strftime("%m/%d/%Y"))
-    await page.fill('#ctl00_PlaceHolderMain_generalSearchForm_txtGSEndDate', end_date.strftime("%m/%d/%Y"))
+    # Clear date fields (search all records)
+    await page.fill('#ctl00_PlaceHolderMain_generalSearchForm_txtGSStartDate', '')
+    await page.fill('#ctl00_PlaceHolderMain_generalSearchForm_txtGSEndDate', '')
     
     # Select Permanent Food Facility Permit
     try:
         await page.select_option('#ctl00_PlaceHolderMain_generalSearchForm_ddlGSPermitType', label="Permanent Food Facility Permit")
         await asyncio.sleep(0.5)
-    except:
-        pass
+    except Exception as exc:
+        raise RuntimeError("Could not select Permanent Food Facility Permit; refusing an unscoped search") from exc
+    selected = await page.locator('#ctl00_PlaceHolderMain_generalSearchForm_ddlGSPermitType option:checked').inner_text()
+    if selected.strip() != "Permanent Food Facility Permit":
+        raise RuntimeError(f"Unexpected record type selected: {selected}")
     
     # Click search
     await page.click('#ctl00_PlaceHolderMain_btnNewSearch')
@@ -100,37 +101,60 @@ async def get_records_on_current_page(page) -> list:
     return records
 
 
-async def go_to_next_page(page) -> bool:
+async def go_to_next_page(page, retries=3) -> bool:
     """Try to go to next page of results. Returns True if successful."""
-    next_btn = page.locator('a:has-text("Next >")').first
-    
-    try:
-        if await next_btn.count() == 0:
-            return False
-        
-        if not await next_btn.is_visible():
-            return False
-        
-        await next_btn.click()
-        
+    for attempt in range(retries):
         try:
-            await page.wait_for_load_state("networkidle", timeout=10000)
-        except:
-            pass
-        await asyncio.sleep(1)
-        
-        return True
-        
-    except:
-        return False
+            next_btn = page.locator('a:has-text("Next >")').first
+
+            if await next_btn.count() == 0:
+                return False
+
+            if not await next_btn.is_visible():
+                raise RuntimeError("Next-page control is unexpectedly hidden")
+
+            # Get current first record to verify page changed
+            first_record = None
+            first_link = page.locator('a[href*="CapDetail"]').first
+            if await first_link.count() > 0:
+                first_record = await first_link.text_content()
+
+            await next_btn.click()
+
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except:
+                pass
+            await asyncio.sleep(1.5)
+
+            # Verify page actually changed
+            new_first = None
+            new_first_link = page.locator('a[href*="CapDetail"]').first
+            if await new_first_link.count() > 0:
+                new_first = await new_first_link.text_content()
+
+            if first_record and new_first and first_record != new_first:
+                return True
+
+            # Page didn't change, retry
+            await asyncio.sleep(1)
+
+        except Exception as e:
+            if attempt < retries - 1:
+                await asyncio.sleep(2)
+                continue
+            raise RuntimeError("Pagination failed before a verified last page; discovery is incomplete") from e
+
+    raise RuntimeError("Pagination did not advance; discovery is incomplete")
 
 
-async def get_attachments_from_record(page, context, record_url: str, record_id: str) -> list:
+async def get_attachments_from_record(page, context, record_url: str, record_id: str) -> tuple:
     """
     Navigate to record, find attachments, and download them.
-    Returns list of downloaded file info.
+    Returns (downloads, status); failed/empty visits must remain retryable.
     """
     downloaded = []
+    failed = False
     
     print(f"  {record_id}:", end="", flush=True)
     
@@ -140,7 +164,7 @@ async def get_attachments_from_record(page, context, record_url: str, record_id:
         await page.wait_for_load_state("domcontentloaded", timeout=DEFAULT_TIMEOUT)
     except PlaywrightTimeout:
         print(" timeout")
-        return []
+        return [], "failed"
     
     await asyncio.sleep(1)
     
@@ -167,14 +191,14 @@ async def get_attachments_from_record(page, context, record_url: str, record_id:
     
     if not attachment_frame:
         print(" no attachment frame")
-        return []
+        return [], "missing_attachment_frame"
     
     # Find file download links
     links = await attachment_frame.locator('a[id*="lnkFileName"]').all()
     
     if not links:
         print(" no attachments")
-        return []
+        return [], "no_attachments"
     
     print(f" {len(links)} file(s):", end="", flush=True)
     
@@ -185,6 +209,7 @@ async def get_attachments_from_record(page, context, record_url: str, record_id:
             file_name = await link.text_content()
             
             if not link_id or not file_name:
+                failed = True
                 continue
             
             file_name = file_name.strip()
@@ -192,7 +217,7 @@ async def get_attachments_from_record(page, context, record_url: str, record_id:
             output_path = OUTPUT_DIR / record_id / safe_name
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
-            if output_path.exists():
+            if output_path.exists() and output_path.stat().st_size > 0:
                 print(" [skip]", end="", flush=True)
                 downloaded.append({"record": record_id, "file": file_name, "path": str(output_path)})
                 continue
@@ -208,18 +233,21 @@ async def get_attachments_from_record(page, context, record_url: str, record_id:
                 downloaded.append({"record": record_id, "file": file_name, "path": str(output_path)})
                 
             except PlaywrightTimeout:
+                failed = True
                 print(" [timeout]", end="", flush=True)
             except Exception as e:
+                failed = True
                 print(f" [error: {str(e)[:20]}]", end="", flush=True)
                 
         except Exception as e:
+            failed = True
             continue
     
     print()  # Newline after record
-    return downloaded
+    return downloaded, "partial_failure" if failed else "complete"
 
 
-async def main():
+async def main(refresh_records=False):
     """Main scraping routine."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
@@ -236,8 +264,9 @@ async def main():
         metadata = {"downloads": [], "processed_records": [], "last_date": None}
     
     processed_records = set(metadata.get("processed_records", []))
+    record_status = metadata.setdefault("record_status", {})
     
-    print(f"Scraping from {START_DATE.date()} to {END_DATE.date()}")
+    print("Discovering all permanent permit records without a permit-date filter")
     print(f"Already processed {len(processed_records)} records")
     print(f"Output directory: {OUTPUT_DIR}\n")
     
@@ -247,8 +276,11 @@ async def main():
         page.set_default_timeout(DEFAULT_TIMEOUT)
         
         try:
+            metadata["discovery_complete"] = False
+            with open(METADATA_FILE, "w") as f:
+                json.dump(metadata, f, indent=2)
             # Start search
-            if not await start_search(page, START_DATE, END_DATE):
+            if not await start_search(page):
                 print("Search failed")
                 return
             
@@ -257,17 +289,28 @@ async def main():
             all_records = []
             seen_ids = set()
             page_num = 1
+            stuck_count = 0
             
             while True:
                 records = await get_records_on_current_page(page)
                 if not records:
-                    break
+                    print(" [no records]", end="", flush=True)
+                    stuck_count += 1
+                    if stuck_count >= 3:
+                        raise RuntimeError("Search repeatedly returned no records; discovery is incomplete")
+                    await asyncio.sleep(2)
+                    continue
                 
                 # Check if we've seen these records before (stuck on same page)
                 new_records = [r for r in records if r["id"] not in seen_ids]
                 if not new_records:
-                    break  # No new records = we're stuck or looping
+                    stuck_count += 1
+                    if stuck_count >= 3:
+                        raise RuntimeError("Search is stuck on repeated records; discovery is incomplete")
+                    await asyncio.sleep(2)
+                    continue
                 
+                stuck_count = 0  # Reset on success
                 for r in new_records:
                     seen_ids.add(r["id"])
                     all_records.append(r)
@@ -275,22 +318,39 @@ async def main():
                 print(f" p{page_num}", end="", flush=True)
                 
                 if not await go_to_next_page(page):
+                    print(" [end]", end="", flush=True)
                     break
                 page_num += 1
             
-            print(f" done ({len(all_records)} records)")
+            print(f" ({len(all_records)} records)")
+            metadata["discovery_complete"] = True
+            metadata["discovered_records"] = all_records
+            metadata["discovered_at"] = datetime.now().isoformat()
+            with open(METADATA_FILE, "w") as f:
+                json.dump(metadata, f, indent=2)
             
             # Filter out already processed
-            to_process = [r for r in all_records if r["id"] not in processed_records]
-            print(f"New records to process: {len(to_process)}\n")
+            # Legacy processed_records includes timeouts and empty records. It
+            # is not evidence of a successful attachment scan.
+            to_process = [r for r in all_records if refresh_records or record_status.get(r["id"], {}).get("status") != "complete"]
+            print(f"Records to scan: {len(to_process)}\n")
             
             # Process each record
             for i, record in enumerate(to_process):
-                downloads = await get_attachments_from_record(page, context, record["url"], record["id"])
+                try:
+                    downloads, status = await get_attachments_from_record(page, context, record["url"], record["id"])
+                except Exception as exc:
+                    print(f"  {record['id']}: {exc}")
+                    downloads, status = [], "failed"
                 
                 # Update metadata
-                metadata["downloads"].extend(downloads)
-                processed_records.add(record["id"])
+                known_paths = {r.get("path") for r in metadata["downloads"]}
+                metadata["downloads"].extend(r for r in downloads if r["path"] not in known_paths)
+                record_status[record["id"]] = {"status": status, "checked_at": datetime.now().isoformat()}
+                if status == "complete":
+                    processed_records.add(record["id"])
+                else:
+                    processed_records.discard(record["id"])
                 metadata["processed_records"] = list(processed_records)
                 
                 # Save after each record
@@ -308,4 +368,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--refresh-records", action="store_true", help="Revisit successful permits for newly added attachments (existing files are reused)")
+    asyncio.run(main(refresh_records=parser.parse_args().refresh_records))
